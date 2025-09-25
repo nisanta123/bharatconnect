@@ -1,0 +1,196 @@
+import 'package:flutter/material.dart';
+import 'package:bharatconnect/widgets/aura_bar.dart';
+import 'package:bharatconnect/models/aura_models.dart' as aura_models; // Alias aura_models
+import 'package:bharatconnect/screens/chat_page.dart'; // Corrected import path
+
+class ChatListScreen extends StatefulWidget {
+  const ChatListScreen({super.key});
+
+  @override
+  State<ChatListScreen> createState() => _ChatListScreenState();
+}
+
+class _ChatListScreenState extends State<ChatListScreen> {
+  final List<Map<String, String?>> _mockChats = const [
+    {
+      'id': 'chat_1', // Added mock chat ID
+      'name': 'Alice',
+      'lastMessage': 'Hey, how are you?',
+      'time': '10:30 AM',
+      'avatarUrl': null, // Set to null
+    },
+    {
+      'id': 'chat_2', // Added mock chat ID
+      'name': 'Bob',
+      'lastMessage': 'Don\'t forget our meeting.',
+      'time': 'Yesterday',
+      'avatarUrl': null, // Set to null
+    },
+    {
+      'id': 'chat_3', // Added mock chat ID
+      'name': 'Charlie',
+      'lastMessage': 'See you soon!',
+      'time': 'Sunday',
+      'avatarUrl': null, // Set to null
+    },
+    {
+      'id': 'chat_4', // Added mock chat ID
+      'name': 'David',
+      'lastMessage': 'Flutter is awesome!',
+      'time': 'Saturday',
+      'avatarUrl': null, // Set to null
+    },
+    {
+      'id': 'chat_5', // Added mock chat ID
+      'name': 'Eve',
+      'lastMessage': 'Let\'s catch up.',
+      'time': 'Friday',
+      'avatarUrl': null, // Set to null
+    },
+    {
+      'id': 'chat_6', // Added mock chat ID
+      'name': 'Frank',
+      'lastMessage': 'New project ideas.',
+      'time': 'Thursday',
+      'avatarUrl': null, // Set to null
+    },
+    {
+      'id': 'chat_7', // Added mock chat ID
+      'name': 'Grace',
+      'lastMessage': 'Meeting at 3 PM.',
+      'time': 'Wednesday',
+      'avatarUrl': null, // Set to null
+    },
+    {
+      'id': 'chat_8', // Added mock chat ID
+      'name': 'Heidi',
+      'lastMessage': 'Can you send the report?',
+      'time': 'Tuesday',
+      'avatarUrl': null, // Set to null
+    },
+    {
+      'id': 'chat_9', // Added mock chat ID
+      'name': 'Ivan',
+      'lastMessage': 'Great work!',
+      'time': 'Monday',
+      'avatarUrl': null, // Set to null
+    },
+    {
+      'id': 'chat_10', // Added mock chat ID
+      'name': 'Judy',
+      'lastMessage': 'See you tomorrow.',
+      'time': 'Sunday',
+      'avatarUrl': null, // Set to null
+    },
+  ];
+
+  // Mock Data for AuraBar
+  final aura_models.AuraUser _currentUser = aura_models.AuraUser(id: '1', name: 'You', avatarUrl: null); // Set avatarUrl to null
+  final List<String> _connectedUserIds = ['2', '3'];
+  final List<aura_models.DisplayAura> _allDisplayAuras = [
+    aura_models.DisplayAura(
+      id: 'mock_aura_id_1', // Added id
+      userId: '1', userName: 'You', userProfileAvatarUrl: '', // Set to empty string
+      auraOptionId: 'fire', // Placeholder
+      createdAt: DateTime.now(), // Placeholder
+      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'fire'), // Placeholder
+    ),
+    aura_models.DisplayAura(
+      id: 'mock_aura_id_2', // Added id
+      userId: '2', userName: 'Alice', userProfileAvatarUrl: '', // Set to empty string
+      auraOptionId: 'water', // Placeholder
+      createdAt: DateTime.now(), // Placeholder
+      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'water'), // Placeholder
+    ),
+    aura_models.DisplayAura(
+      id: 'mock_aura_id_3', // Added id
+      userId: '3', userName: 'Bob', userProfileAvatarUrl: '', // Set to empty string
+      auraOptionId: 'earth', // Placeholder
+      createdAt: DateTime.now(), // Placeholder
+      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'earth'), // Placeholder
+    ),
+    aura_models.DisplayAura(
+      id: 'mock_aura_id_4', // Added id
+      userId: '4', userName: 'Charlie', userProfileAvatarUrl: '', // Set to empty string
+      auraOptionId: 'air', // Placeholder
+      createdAt: DateTime.now(), // Placeholder
+      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'air'), // Placeholder
+    ),
+  ];
+  bool _isLoadingAuras = false; // Set to true to test loading state
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = Theme.of(context).scaffoldBackgroundColor; // Same as header/footer
+
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: AuraBar(
+            isLoading: _isLoadingAuras,
+            allDisplayAuras: _allDisplayAuras,
+            currentUser: _currentUser,
+            connectedUserIds: _connectedUserIds,
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final chat = _mockChats[index];
+              return Container(
+                color: backgroundColor, // Match header/footer background
+                child: ListTile(
+                  tileColor: backgroundColor, // Force same background for tile
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  leading: CircleAvatar(
+                    radius: 28, // Increased from 25
+                    backgroundColor: Colors.grey, // Consistent grey background
+                    backgroundImage: chat['avatarUrl'] != null && chat['avatarUrl']!.isNotEmpty
+                        ? NetworkImage(chat['avatarUrl']!)
+                        : null,
+                    child: chat['avatarUrl'] == null || chat['avatarUrl']!.isEmpty
+                        ? const Icon(Icons.person, color: Colors.white, size: 35) // Adjusted icon size
+                        : null,
+                  ),
+                  title: Text(
+                    chat['name']!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onBackground),
+                  ),
+                  subtitle: Text(
+                    chat['lastMessage']!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onBackground.withOpacity(0.7)),
+                  ),
+                  trailing: Text(
+                    chat['time']!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onBackground.withOpacity(0.6)),
+                  ),
+                  onTap: () {
+                    Navigator.of(context).push(PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) => ChatPage(chatId: chat['id']!),
+                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        const begin = Offset(1.0, 0.0); // Start from right
+                        const end = Offset.zero;
+                        const curve = Curves.ease;
+
+                        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+                        return SlideTransition(
+                          position: animation.drive(tween),
+                          child: FadeTransition(
+                            opacity: animation,
+                            child: child,
+                          ),
+                        );
+                      },
+                    ));
+                  },
+                ),
+              );
+            },
+            childCount: _mockChats.length,
+          ),
+        ),
+      ],
+    );
+  }
+}

@@ -1,0 +1,110 @@
+import 'package:flutter/material.dart';
+import 'package:bharatconnect/models/search_models.dart'; // For User model
+
+class ProfileCard extends StatelessWidget {
+  final User? initialProfileData;
+  final String? authUid;
+
+  const ProfileCard({
+    super.key,
+    this.initialProfileData,
+    this.authUid,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center, // Center align content
+          children: [
+            CircleAvatar(
+              radius: 40,
+              backgroundColor: Colors.grey, // Add a background color for the default avatar
+              backgroundImage: (initialProfileData?.avatarUrl != null && initialProfileData!.avatarUrl!.isNotEmpty)
+                  ? NetworkImage(initialProfileData!.avatarUrl!)
+                  : null,
+              child: (initialProfileData?.avatarUrl == null || initialProfileData!.avatarUrl!.isEmpty)
+                  ? const Icon(Icons.person, size: 50, color: Colors.white) // Add color to the icon
+                  : null,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              initialProfileData?.name ?? 'User',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 24), // Increased spacing
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Display Name',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                initialProfileData?.name ?? 'User',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Username',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '@${initialProfileData?.username ?? 'No username'}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Email',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              readOnly: true,
+              controller: TextEditingController(text: initialProfileData?.email ?? 'No email'),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.mail_outline),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Bio',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                initialProfileData?.bio ?? 'No bio available.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

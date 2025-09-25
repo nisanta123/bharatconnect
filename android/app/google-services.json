@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "278930729037",
+    "project_id": "bharatconnect-k1w9z",
+    "storage_bucket": "bharatconnect-k1w9z.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:278930729037:android:43f1a1160d2bfbbd68d404",
+        "android_client_info": {
+          "package_name": "com.example.bharatconnect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAw-9X5jwtdkBOyVOLg1hqbPeNTSfTYiVA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
