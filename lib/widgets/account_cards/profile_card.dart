@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:bharatconnect/models/search_models.dart'; // For User model
+import 'package:bharatconnect/models/user_profile_model.dart'; // Import UserProfile model
 
 class ProfileCard extends StatelessWidget {
-  final User? initialProfileData;
+  final UserProfile? initialProfileData;
   final String? authUid;
 
   const ProfileCard({
@@ -32,7 +32,7 @@ class ProfileCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              initialProfileData?.name ?? 'User',
+              initialProfileData?.displayName ?? initialProfileData?.username ?? 'User',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 24), // Increased spacing
@@ -46,7 +46,7 @@ class ProfileCard extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                initialProfileData?.name ?? 'User',
+                initialProfileData?.displayName ?? initialProfileData?.username ?? 'User',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),

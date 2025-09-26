@@ -25,8 +25,8 @@ class ChatPageHeader extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      leadingWidth: 70,
-      titleSpacing: 0,
+      leadingWidth: 40, // Reduced leadingWidth to shift back button more to the left
+      titleSpacing: 4, // Reduced titleSpacing to decrease gap from profile picture
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         onPressed: () {
@@ -41,15 +41,15 @@ class ChatPageHeader extends StatelessWidget implements PreferredSizeWidget {
         child: Row(
           children: [
             CircleAvatar(
-              radius: 20,
+              radius: 18, // Slightly reduced radius for smaller profile picture
               backgroundImage: contactAvatarUrl != null && contactAvatarUrl!.isNotEmpty
                   ? NetworkImage(contactAvatarUrl!)
                   : null,
               child: contactAvatarUrl == null || contactAvatarUrl!.isEmpty
-                  ? const Icon(Icons.person, size: 24)
+                  ? const Icon(Icons.person, size: 22) // Adjusted icon size
                   : null,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6), // Reduced width for smaller gap
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bharatconnect/models/user_profile_model.dart';
 import 'package:bharatconnect/screens/signup_screen.dart';
 import 'package:bharatconnect/main.dart';
-import 'package:bharatconnect/widgets/logo.dart'; // Import the new Logo widget
+import 'package:bharatconnect/widgets/logo.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -30,52 +30,38 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = true;
         _errorMessage = null;
       });
-      // try {
-      //   await FirebaseAuth.instance.signInWithEmailAndPassword(
-      //     email: _email,
-      //     password: _password,
-      //   );
-      // } on FirebaseAuthException catch (e) {
-      //   String message;
-      //   if (e.code == 'user-not-found' || e.code == 'wrong-password') {
-      //     message = 'Incorrect email or password. If you\'re new, please Sign Up!';
-      //   } else if (e.code == 'invalid-email') {
-      //     message = 'Invalid email format.';
-      //   } else if (e.code == 'network-request-failed') {
-      //     message = 'Network error. Please check your connection.';
-      //   } else if (e.code == 'too-many-requests') {
-      //     message = 'Access to this account has been temporarily disabled due to many failed login attempts. You can immediately restore it by resetting your password or you can try again later.';
-      //   } else {
-      //     message = 'An unexpected error occurred during login.';
-      //   }
-      //   setState(() {
-      //     _errorMessage = message;
-      //   });
-      //   print(e);
-      // } catch (e) {
-      //   setState(() {
-      //     _errorMessage = 'An unexpected error occurred.';
-      //   });
-      //   print(e);
-      // } finally {
-      //   setState(() {
-      //     _isLoading = false;
-      //   });
-      // }
-      // Placeholder for login logic
-      await Future.delayed(const Duration(seconds: 1)); // Simulate network request
-      if (_email == "test@example.com" && _password == "password") {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const WhatsAppHome()),
+      try {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: _email,
+          password: _password,
         );
-      } else {
+      } on FirebaseAuthException catch (e) {
+        String message;
+        if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+          message = 'Incorrect email or password. If you\'re new, please Sign Up first!';
+        } else if (e.code == 'invalid-email') {
+          message = 'Invalid email format. Please check your email address.';
+        } else if (e.code == 'network-request-failed') {
+          message = 'Network error. Please check your connection.';
+        } else if (e.code == 'too-many-requests') {
+          message = 'Access to this account has been temporarily disabled due to many failed login attempts. You can immediately restore it by resetting your password or you can try again later.';
+        } else {
+          message = 'An unexpected error occurred during login.';
+        }
         setState(() {
-          _errorMessage = 'Incorrect email or password. If you\'re new, please Sign Up!';
+          _errorMessage = message;
+        });
+        print(e);
+      } catch (e) {
+        setState(() {
+          _errorMessage = 'An unexpected error occurred.';
+        });
+        print(e);
+      } finally {
+        setState(() {
+          _isLoading = false;
         });
       }
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
@@ -96,39 +82,32 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoading = true;
       _errorMessage = null;
     });
-    // try {
-    //   await FirebaseAuth.instance.sendPasswordResetEmail(email: _email);
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     SnackBar(content: Text('Password reset email sent to $_email')),
-    //   );
-    // } on FirebaseAuthException catch (e) {
-    //   String message;
-    //   if (e.code == 'user-not-found' || e.code == 'invalid-email') {
-    //     message = 'No user found with this email. Please sign up if you are new.';
-    //   } else {
-    //     message = 'Failed to send password reset email.';
-    //   }
-    //   setState(() {
-    //     _errorMessage = message;
-    //   });
-    //   print(e);
-    // } catch (e) {
-    //   setState(() {
-    //     _errorMessage = 'An unexpected error occurred.';
-    //   });
-    //   print(e);
-    // } finally {
-    //   setState(() {
-    //     _isLoading = false;
-    //   });
-    // }
-    await Future.delayed(const Duration(seconds: 1)); // Simulate network request
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('If an account exists for $_email, a password reset link has been sent.')),
-    );
-    setState(() {
-      _isLoading = false;
-    });
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: _email);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Password reset email sent to $_email')),
+      );
+    } on FirebaseAuthException catch (e) {
+      String message;
+      if (e.code == 'user-not-found' || e.code == 'invalid-email') {
+        message = 'No user found with this email. Please sign up if you are new.';
+      } else {
+        message = 'Failed to send password reset email.';
+      }
+      setState(() {
+        _errorMessage = message;
+      });
+      print(e);
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'An unexpected error occurred.';
+      });
+      print(e);
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _handleSignUpClick() {

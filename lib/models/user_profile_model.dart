@@ -1,4 +1,4 @@
-// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserProfile {
   final String id;
@@ -24,34 +24,34 @@ class UserProfile {
   });
 
   // Factory constructor to create a UserProfile from a Firestore document
-  // factory UserProfile.fromFirestore(DocumentSnapshot doc) {
-  //   final data = doc.data() as Map<String, dynamic>;
-  //   return UserProfile(
-  //     id: doc.id,
-  //     email: data['email'] as String,
-  //     username: data['username'] as String?,
-  //     displayName: data['displayName'] as String?,
-  //     avatarUrl: data['avatarUrl'] as String?,
-  //     onboardingComplete: data['onboardingComplete'] as bool? ?? false,
-  //     phone: data['phone'] as String?,
-  //     bio: data['bio'] as String?,
-  //     activeKeyId: data['activeKeyId'] as String?,
-  //   );
-  // }
+  factory UserProfile.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return UserProfile(
+      id: doc.id,
+      email: data['email'] as String,
+      username: data['username'] as String?,
+      displayName: data['displayName'] as String?,
+      avatarUrl: data['avatarUrl'] as String?,
+      onboardingComplete: data['onboardingComplete'] as bool? ?? false,
+      phone: data['phone'] as String?,
+      bio: data['bio'] as String?,
+      activeKeyId: data['activeKeyId'] as String?,
+    );
+  }
 
   // Method to convert UserProfile to a map for Firestore
-  // Map<String, dynamic> toFirestore() {
-  //   return {
-  //     'email': email,
-  //     'username': username,
-  //     'displayName': displayName,
-  //     'avatarUrl': avatarUrl,
-  //     'onboardingComplete': onboardingComplete,
-  //     'phone': phone,
-  //     'bio': bio,
-  //     'activeKeyId': activeKeyId,
-  //   };
-  // }
+  Map<String, dynamic> toFirestore() {
+    return {
+      'email': email,
+      'username': username,
+      'displayName': displayName,
+      'avatarUrl': avatarUrl,
+      'onboardingComplete': onboardingComplete,
+      'phone': phone,
+      'bio': bio,
+      'activeKeyId': activeKeyId,
+    };
+  }
 
   // Method to update specific fields
   UserProfile copyWith({

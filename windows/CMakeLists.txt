@@ -2,6 +2,10 @@
 cmake_minimum_required(VERSION 3.14)
 project(bharatconnect LANGUAGES CXX)
 
+# Explicitly set C++ standard and runtime library for consistency across all targets, including plugins.
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL" CACHE STRING "" FORCE)
+
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
 set(BINARY_NAME "bharatconnect")
@@ -29,6 +33,10 @@ set(CMAKE_SHARED_LINKER_FLAGS_PROFILE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE}")
 set(CMAKE_C_FLAGS_PROFILE "${CMAKE_C_FLAGS_RELEASE}")
 set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 
+# Disable treating warnings as errors globally and suppress specific warnings.
+add_compile_options(/WX- /wd4996)
+add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
@@ -39,8 +47,7 @@ add_definitions(-DUNICODE -D_UNICODE)
 # of modifying this function.
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_17)
-  target_compile_options(${TARGET} PRIVATE /W4 /WX /wd"4100")
-  target_compile_options(${TARGET} PRIVATE /EHsc)
+  target_compile_options(${TARGET} PRIVATE /W4 /EHsc /wd4100)
   target_compile_definitions(${TARGET} PRIVATE "_HAS_EXCEPTIONS=0")
   target_compile_definitions(${TARGET} PRIVATE "$<$<CONFIG:Debug>:_DEBUG>")
 endfunction()

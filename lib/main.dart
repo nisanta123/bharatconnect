@@ -1,25 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:bharatconnect/screens/chat_list_screen.dart';
-import 'package:bharatconnect/screens/status_screen.dart';
-import 'package:bharatconnect/screens/calls_screen.dart';
-import 'package:bharatconnect/screens/search_screen.dart';
-import 'package:bharatconnect/screens/account_screen.dart';
-import 'package:bharatconnect/widgets/aura_bar.dart';
-import 'package:bharatconnect/models/aura_models.dart' as aura_models; // Alias aura_models
-// import 'package:firebase_core/firebase_core.dart';
-// import 'package:bharatconnect/firebase_options.dart';
-// import 'package:firebase_auth/firebase_auth.dart' as fb_auth; // Alias firebase_auth
-// import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'package:bharatconnect/models/user_profile_model.dart'; // Add this import
+import 'package:firebase_core/firebase_core.dart'; // Re-added Firebase Core import
+import 'package:bharatconnect/firebase_options.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth; // Re-added Firebase Auth import
+import 'package:cloud_firestore/cloud_firestore.dart'; // Re-added Cloud Firestore import
+import 'package:bharatconnect/models/user_profile_model.dart'; // Add this import
 import 'package:bharatconnect/screens/login_screen.dart'; // Update import
 import 'package:bharatconnect/screens/profile_setup_screen.dart'; // Add this import
 import 'package:bharatconnect/screens/signup_screen.dart'; // Import SignupScreen
+import 'package:bharatconnect/screens/home_screen.dart'; // Import HomeScreen
+import 'package:bharatconnect/utils/no_scrollbar_behavior.dart'; // Import NoScrollbarBehavior
 
-void main() { // Mark main as async
-  // WidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter binding is initialized
-  // await Firebase.initializeApp(
-  //   options: DefaultFirebaseOptions.currentPlatform,
-  // ); // Initialize Firebase
+void main() async { // Mark main as async
+  WidgetsFlutterBinding.ensureInitialized(); // Ensure Flutter binding is initialized
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } on FirebaseException catch (e) {
+    if (e.code == 'duplicate-app') {
+      print('Firebase app already initialized. Skipping.');
+    }
+  }
   runApp(const MyApp());
 }
 
@@ -28,8 +29,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('MyApp: build method called.');
     return MaterialApp(
       title: 'BharatConnect',
+      scrollBehavior: NoScrollbarBehavior(), // Apply custom scroll behavior globally
       theme: ThemeData(
         brightness: Brightness.dark, // Overall dark theme
         scaffoldBackgroundColor: const Color(0xFF121212), // --background
@@ -101,227 +104,57 @@ class MyApp extends StatelessWidget {
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
           backgroundColor: Color(0xFF121212), // unified
         ),
-      ),
-      home: SignupScreen(), // Directly navigate to SignupScreen
-    );
-  }
-}
-
-class WhatsAppHome extends StatefulWidget {
-  const WhatsAppHome({super.key});
-
-  @override
-  State<WhatsAppHome> createState() => _WhatsAppHomeState();
-}
-
-class _WhatsAppHomeState extends State<WhatsAppHome> {
-  int _selectedIndex = 0;
-  late PageController _pageController;
-  // UserProfile? _currentUserProfile; // Store the fetched user profile
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController(initialPage: _selectedIndex);
-    // _fetchCurrentUserProfile(); // Fetch user profile on init
-  }
-
-  // Future<void> _fetchCurrentUserProfile() async {
-  //   final user = fb_auth.FirebaseAuth.instance.currentUser; // Use fb_auth.FirebaseAuth
-  //   if (user != null) {
-  //     final doc = await FirebaseFirestore.instance.collection('bharatConnectUsers').doc(user.uid).get();
-  //     if (doc.exists) {
-  //       setState(() {
-  //         _currentUserProfile = UserProfile.fromFirestore(doc);
-  //       });
-  //     }
-  //   }
-  // }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  // Mock Data for AuraBar
-  // Use fetched user profile for _currentUser
-  // final User _currentUser = User(id: '1', name: 'You', avatarUrl: 'https://via.placeholder.com/150/FF0000/FFFFFF?text=U');
-  final List<String> _connectedUserIds = ['2', '3']; // Keep mock for now
-  final List<aura_models.DisplayAura> _allDisplayAuras = [
-    // Use fetched user profile for the current user's aura
-    // aura_models.DisplayAura(
-    //   userId: '1', userName: 'You', userProfileAvatarUrl: 'https://via.placeholder.com/150/FF0000/FFFFFF?text=U', auraImageUrl: 'https://via.placeholder.com/150/FF0000/FFFFFF?text=A1', auraId: 'aura1',
-    // ),
-    // Keep other mock auras for now
-    aura_models.DisplayAura(
-      id: 'mock_aura_id_2', // Added id
-      userId: '2', userName: 'Alice', userProfileAvatarUrl: 'https://via.placeholder.com/150/0000FF/FFFFFF?text=A',
-      auraOptionId: 'aura2', // Use auraOptionId
-      createdAt: DateTime.now(), // Provide a DateTime
-      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'water'), // Example auraStyle
-    ),
-    aura_models.DisplayAura(
-      id: 'mock_aura_id_3', // Added id
-      userId: '3', userName: 'Bob', userProfileAvatarUrl: 'https://via.placeholder.com/150/00FF00/FFFFFF?text=B',
-      auraOptionId: 'aura3', // Use auraOptionId
-      createdAt: DateTime.now(), // Provide a DateTime
-      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'earth'), // Example auraStyle
-    ),
-    aura_models.DisplayAura(
-      id: 'mock_aura_id_4', // Added id
-      userId: '4', userName: 'Charlie', userProfileAvatarUrl: 'https://via.placeholder.com/150/FFFF00/000000?text=C',
-      auraOptionId: 'aura4', // Use auraOptionId
-      createdAt: DateTime.now(), // Provide a DateTime
-      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'fire'), // Example auraStyle
-    ),
-  ];
-  bool _isLoadingAuras = false; // Set to true to test loading state
-
-  final List<Widget> _widgetOptions = <Widget>[
-    ChatListScreen(), // Removed const
-    const SearchScreen(), // Use the new SearchScreen widget
-    const StatusScreen(), // Now StatusScreen is const again, as its internal issues are fixed.
-    const CallsScreen(),
-    const AccountScreen(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-      _pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 300), // Smooth animation duration
-        curve: Curves.ease, // Animation curve
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Display a loading indicator if user profile is not yet fetched
-    // if (_currentUserProfile == null) {
-    //   return const Scaffold(
-    //     body: Center(child: CircularProgressIndicator()),
-    //   );
-    // }
-
-    // Create a AuraUser object from UserProfile for AuraBar
-    final aura_models.AuraUser currentUserForAuraBar = aura_models.AuraUser( // Explicitly use AuraUser from aura_models.dart
-      id: 'mock_user_id', // Placeholder ID
-      name: 'You', // Placeholder name
-      avatarUrl: 'https://via.placeholder.com/150/FF0000/FFFFFF?text=U', // Placeholder avatar
-    );
-
-    // Update _allDisplayAuras to include the current user's aura dynamically
-    final List<aura_models.DisplayAura> updatedDisplayAuras = [
-      aura_models.DisplayAura(
-        id: 'mock_aura_id_1', // Added id
-        userId: currentUserForAuraBar.id,
-        userName: currentUserForAuraBar.name,
-        userProfileAvatarUrl: currentUserForAuraBar.avatarUrl ?? '', // Handle nullability
-        auraOptionId: 'aura1', // Placeholder aura option ID
-        createdAt: DateTime.now(), // Provide a DateTime
-        auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'fire'), // Example auraStyle
-      ),
-      // Add other mock auras here if needed, or fetch them from Firestore
-      ..._allDisplayAuras.where((aura) => (aura as aura_models.DisplayAura).userId != currentUserForAuraBar.id).toList(), // Explicit cast
-    ];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [
-              Color(0xFF42A5F5), // Primary Blue
-              Color(0xFFAB47BC), // Accent Violet
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ).createShader(bounds),
-          child: const Text(
-            'BharatConnect',
-            style: TextStyle(
-              fontFamily: 'Times New Roman',
-              fontSize: 30, // Increased font size to 30px (Medium size)
-              fontWeight: FontWeight.bold,
-              color: Colors.white, // This color will be masked by the gradient
-            ),
-          ),
-        ),
-        actions: <Widget>[
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: Color(0xFFFAFAFA)), // Bell icon
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Color(0xFFFAFAFA)), // Three dots menu
-            onPressed: () {},
-          ),
-        ],
-      ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
+      ), // Closing parenthesis for ThemeData
+      home: StreamBuilder<fb_auth.User?>( // Use fb_auth.User
+        stream: fb_auth.FirebaseAuth.instance.authStateChanges(), // Use fb_auth.FirebaseAuth
+        builder: (context, authSnapshot) {
+          print('MyApp: StreamBuilder - Auth ConnectionState: ${authSnapshot.connectionState}');
+          print('MyApp: StreamBuilder - Auth Has Data: ${authSnapshot.hasData}');
+          if (authSnapshot.connectionState == ConnectionState.waiting) {
+            print('MyApp: StreamBuilder - Auth ConnectionState: waiting');
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (authSnapshot.hasData) {
+            print('MyApp: StreamBuilder - User is logged in: ${authSnapshot.data!.uid}');
+            // User is logged in, now check their profile status
+            return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              future: FirebaseFirestore.instance
+                  .collection('bharatConnectUsers')
+                  .doc(authSnapshot.data!.uid)
+                  .get(),
+              builder: (context, userProfileSnapshot) {
+                print('MyApp: FutureBuilder - UserProfile ConnectionState: ${userProfileSnapshot.connectionState}');
+                print('MyApp: FutureBuilder - UserProfile Has Data: ${userProfileSnapshot.hasData}');
+                print('MyApp: FutureBuilder - UserProfile Data Exists: ${userProfileSnapshot.data?.exists}');
+                if (userProfileSnapshot.connectionState == ConnectionState.waiting) {
+                  print('MyApp: FutureBuilder - UserProfile ConnectionState: waiting');
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (userProfileSnapshot.hasData && userProfileSnapshot.data!.exists) {
+                  final userProfile = UserProfile.fromFirestore(userProfileSnapshot.data!); // Use fromFirestore
+                  print('MyApp: UserProfile onboardingComplete: ${userProfile.onboardingComplete}');
+                  if (userProfile.onboardingComplete) {
+                    print('MyApp: Navigating to HomeScreen.'); // Updated navigation
+                    return HomeScreen(); // Now refers to the rich home screen
+                  } else {
+                    print('MyApp: Navigating to ProfileSetupScreen.');
+                    return ProfileSetupScreen(user: authSnapshot.data!); // Pass the user object
+                  }
+                } else {
+                  print('MyApp: User authenticated but no profile or incomplete profile. Navigating to ProfileSetupScreen.');
+                  // User is authenticated but no profile found (shouldn't happen if signup creates it)
+                  // Or profile data is incomplete/corrupted
+                  return ProfileSetupScreen(user: authSnapshot.data!); // Pass the user object
+                }
+              },
+            );
+          } else {
+            print('MyApp: No user logged in. Navigating to LoginScreen.');
+            // No user logged in
+            return const LoginScreen(); // Show the LoginScreen
+          }
         },
-        children: _widgetOptions,
       ),
-      floatingActionButton: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [
-              Color(0xFF42A5F5), // Primary Blue
-              Color(0xFFAB47BC), // Accent Violet
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(50.0), // Adjust as needed for FAB shape
-        ),
-        child: FloatingActionButton(
-          onPressed: () {},
-          backgroundColor: Colors.transparent, // Make FAB background transparent
-          elevation: 0, // Remove elevation to show gradient fully
-          child: const Icon(Icons.add, color: Colors.white), // Plus icon
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            activeIcon: Icon(Icons.chat_bubble),
-            label: 'Chats',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.search),
-            label: 'Search',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.camera_alt_outlined),
-            activeIcon: Icon(Icons.camera_alt),
-            label: 'Status',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.call_outlined),
-            activeIcon: Icon(Icons.call),
-            label: 'Calls',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: 'Account',
-          ),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: Theme.of(context).colorScheme.primary, // Primary color for selected item
-        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6), // Muted foreground for unselected
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed, // To show all labels
-        backgroundColor: Theme.of(context).cardColor, // Card color for background
-      ),
-    );
+    ); // Closing parenthesis for MaterialApp
   }
 }

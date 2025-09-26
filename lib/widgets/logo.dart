@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart'; // Import google_fonts
 
 class Logo extends StatelessWidget {
   final String size; // Can be 'small' or 'large'
@@ -32,8 +33,7 @@ class Logo extends StatelessWidget {
       ).createShader(bounds),
       child: Text(
         'BharatConnect',
-        style: TextStyle(
-          fontFamily: 'Times New Roman',
+        style: GoogleFonts.playfairDisplay( // Using Playfair Display from Google Fonts
           fontSize: fontSize,
           fontWeight: FontWeight.bold,
           color: Colors.white, // This color will be masked by the gradient

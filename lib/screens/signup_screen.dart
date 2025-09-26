@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
-// import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bharatconnect/models/user_profile_model.dart';
 import 'package:bharatconnect/main.dart'; // Import WhatsAppHome
 import 'package:bharatconnect/screens/login_screen.dart'; // Import LoginScreen
 import 'package:bharatconnect/widgets/logo.dart'; // Import the new Logo widget
+import 'package:bharatconnect/screens/profile_setup_screen.dart'; // Import ProfileSetupScreen
+import 'package:bharatconnect/widgets/custom_toast.dart'; // Import CustomToast
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -20,8 +22,21 @@ class _SignupScreenState extends State<SignupScreen> {
   String _confirmPassword = '';
   String? _errorMessage;
   bool _isLoading = false;
+  bool _isPasswordVisible = false; // Added for password visibility toggle
+  bool _isConfirmPasswordVisible = false; // Added for confirm password visibility toggle
+
+  @override
+  void initState() {
+    super.initState();
+    print('SignupScreen: initState called.');
+  }
+
+  void _showCustomMessage(String message, {bool isError = false}) {
+    showCustomToast(context, message, isError: isError);
+  }
 
   void _trySubmit() async {
+    print('SignupScreen: _trySubmit started.');
     final isValid = _formKey.currentState?.validate();
     FocusScope.of(context).unfocus();
 
@@ -31,12 +46,15 @@ class _SignupScreenState extends State<SignupScreen> {
         _isLoading = true;
         _errorMessage = null;
       });
+      print('SignupScreen: Form is valid, _isLoading set to true.');
 
-      if (_password != _confirmPassword) {
+      if (_password.trim() != _confirmPassword.trim()) {
         setState(() {
           _errorMessage = 'Passwords do not match.';
           _isLoading = false;
         });
+        print('SignupScreen: Passwords do not match.');
+        _showCustomMessage('Passwords do not match.', isError: true);
         return;
       }
       if (_password.length < 6) {
@@ -44,68 +62,55 @@ class _SignupScreenState extends State<SignupScreen> {
           _errorMessage = 'Password should be at least 6 characters.';
           _isLoading = false;
         });
+        print('SignupScreen: Password too short.');
+        _showCustomMessage('Password should be at least 6 characters.', isError: true);
         return;
       }
 
-      // try {
-      //   UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-      //     email: _email,
-      //     password: _password,
-      //   );
-      //   // Create initial user profile in Firestore
-      //   if (userCredential.user != null) {
-      //     await FirebaseFirestore.instance
-      //         .collection('bharatConnectUsers')
-      //         .doc(userCredential.user!.uid)
-      //         .set(UserProfile(
-      //           id: userCredential.user!.uid,
-      //           email: _email,
-      //           onboardingComplete: false,
-      //         ).toFirestore());
-      //     // After successful signup and initial profile creation, pop to login or directly to profile setup
-      //     Navigator.of(context).pop(); // Go back to login screen
-      //   }
-      // } on FirebaseAuthException catch (e) {
-      //   String message;
-      //   if (e.code == 'email-already-in-use') {
-      //     message = 'This email is already registered. Please login or use a different email.';
-      //   } else if (e.code == 'weak-password') {
-      //     message = 'Password is too weak. Please choose a stronger password.';
-      //   } else if (e.code == 'invalid-email') {
-      //     message = 'Invalid email format. Please check your email address.';
-      //   } else if (e.code == 'network-request-failed') {
-      //     message = 'Network error. Please check your connection and try again.';
-      //   } else {
-      //     message = 'An unexpected error occurred during signup. Please try again.';
-      //   }
-      //   setState(() {
-      //     _errorMessage = message;
-      //   });
-      //   print(e);
-      // } catch (e) {
-      //   setState(() {
-      //     _errorMessage = 'An unexpected error occurred.';
-      //   });
-      //   print(e);
-      // } finally {
-      //   setState(() {
-      //     _isLoading = false;
-      //   });
-      // }
-      // Placeholder for signup logic
-      await Future.delayed(const Duration(seconds: 1)); // Simulate network request
-      if (_email == "new@example.com" && _password == "password") {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const WhatsAppHome()),
+      try {
+        print('SignupScreen: Attempting to create user with email and password.');
+        UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: _email,
+          password: _password,
         );
-      } else {
+        print('SignupScreen: User created successfully: ${userCredential.user?.uid}');
+        // Create initial user profile in Firestore
+        if (userCredential.user != null) {
+          print('SignupScreen: User created successfully: ${userCredential.user?.uid}');
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => ProfileSetupScreen(user: userCredential.user!)),
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        String message;
+        if (e.code == 'email-already-in-use') {
+          message = 'This email is already registered. Please login or use a different email.';
+        } else if (e.code == 'weak-password') {
+          message = 'Password is too weak. Please choose a stronger password.';
+        } else if (e.code == 'invalid-email') {
+          message = 'Invalid email format. Please check your email address.';
+        } else if (e.code == 'network-request-failed') {
+          message = 'Network error. Please check your connection and try again.';
+        } else {
+          message = 'An unexpected error occurred during signup. Please try again.';
+        }
         setState(() {
-          _errorMessage = 'An unexpected error occurred during signup. Please try again.';
+          _errorMessage = message;
+        });
+        _showCustomMessage(message, isError: true);
+        print('SignupScreen: FirebaseAuthException: ${e.code} - ${e.message}');
+      } catch (e) {
+        setState(() {
+          _errorMessage = 'An unexpected error occurred.';
+        });
+        _showCustomMessage('An unexpected error occurred.', isError: true);
+        print('SignupScreen: Unexpected error: $e');
+      } finally {
+        print('SignupScreen: _trySubmit finished. Setting _isLoading to false.');
+        setState(() {
+          _isLoading = false;
         });
       }
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
@@ -117,6 +122,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('SignupScreen: build method called.');
     return Scaffold(
       body: Center(
         child: ScrollConfiguration(
@@ -182,7 +188,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         ),
                         onSaved: (value) {
-                          _email = value!;
+                          _email = value!.trim(); // Trim email on save
                         },
                         enabled: !_isLoading,
                       ),
@@ -216,10 +222,24 @@ class _SignupScreenState extends State<SignupScreen> {
                             borderRadius: BorderRadius.circular(8.0),
                             borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
                           ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isPasswordVisible = !_isPasswordVisible;
+                              });
+                            },
+                          ),
                         ),
-                        obscureText: true,
+                        obscureText: !_isPasswordVisible,
                         onSaved: (value) {
-                          _password = value!;
+                          _password = value!.trim(); // Trim password on save
+                        },
+                        onChanged: (value) {
+                          _password = value.trim(); // Update _password immediately and trimmed
                         },
                         enabled: !_isLoading,
                       ),
@@ -235,7 +255,7 @@ class _SignupScreenState extends State<SignupScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Please confirm your password.';
                           }
-                          if (value != _password) {
+                          if (value.trim() != _password.trim()) { // Ensure comparison is trimmed
                             return 'Passwords do not match.';
                           }
                           return null;
@@ -256,10 +276,21 @@ class _SignupScreenState extends State<SignupScreen> {
                             borderRadius: BorderRadius.circular(8.0),
                             borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 2.0),
                           ),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                              });
+                            },
+                          ),
                         ),
-                        obscureText: true,
+                        obscureText: !_isConfirmPasswordVisible,
                         onSaved: (value) {
-                          _confirmPassword = value!;
+                          _confirmPassword = value!.trim(); // Trim confirm password on save
                         },
                         enabled: !_isLoading,
                       ),
@@ -302,25 +333,29 @@ class _SignupScreenState extends State<SignupScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "Already have an account? ",
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
-                          ),
-                          GestureDetector(
-                            onTap: _isLoading ? null : _handleLoginLinkClick,
-                            child: Text(
-                              'Login',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontWeight: FontWeight.bold,
+                      Container(
+                        width: double.infinity,
+                        alignment: Alignment.center,
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          children: [
+                            Text(
+                              "Already have an account? ",
+                              style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                            ),
+                            GestureDetector(
+                              onTap: _isLoading ? null : _handleLoginLinkClick,
+                              child: Text(
+                                'Login',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
-                      )
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:bharatconnect/widgets/aura_bar.dart';
 import 'package:bharatconnect/models/aura_models.dart' as aura_models; // Alias aura_models
 import 'package:bharatconnect/screens/chat_page.dart'; // Corrected import path
+import 'package:bharatconnect/models/user_profile_model.dart'; // Import UserProfile
 
 class ChatListScreen extends StatefulWidget {
-  const ChatListScreen({super.key});
+  final UserProfile? currentUserProfile; // Accept currentUserProfile
+
+  const ChatListScreen({super.key, this.currentUserProfile});
 
   @override
   State<ChatListScreen> createState() => _ChatListScreenState();
@@ -85,54 +88,31 @@ class _ChatListScreenState extends State<ChatListScreen> {
   ];
 
   // Mock Data for AuraBar
-  final aura_models.AuraUser _currentUser = aura_models.AuraUser(id: '1', name: 'You', avatarUrl: null); // Set avatarUrl to null
-  final List<String> _connectedUserIds = ['2', '3'];
-  final List<aura_models.DisplayAura> _allDisplayAuras = [
-    aura_models.DisplayAura(
-      id: 'mock_aura_id_1', // Added id
-      userId: '1', userName: 'You', userProfileAvatarUrl: '', // Set to empty string
-      auraOptionId: 'fire', // Placeholder
-      createdAt: DateTime.now(), // Placeholder
-      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'fire'), // Placeholder
-    ),
-    aura_models.DisplayAura(
-      id: 'mock_aura_id_2', // Added id
-      userId: '2', userName: 'Alice', userProfileAvatarUrl: '', // Set to empty string
-      auraOptionId: 'water', // Placeholder
-      createdAt: DateTime.now(), // Placeholder
-      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'water'), // Placeholder
-    ),
-    aura_models.DisplayAura(
-      id: 'mock_aura_id_3', // Added id
-      userId: '3', userName: 'Bob', userProfileAvatarUrl: '', // Set to empty string
-      auraOptionId: 'earth', // Placeholder
-      createdAt: DateTime.now(), // Placeholder
-      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'earth'), // Placeholder
-    ),
-    aura_models.DisplayAura(
-      id: 'mock_aura_id_4', // Added id
-      userId: '4', userName: 'Charlie', userProfileAvatarUrl: '', // Set to empty string
-      auraOptionId: 'air', // Placeholder
-      createdAt: DateTime.now(), // Placeholder
-      auraStyle: aura_models.AURA_OPTIONS.firstWhere((e) => e.id == 'air'), // Placeholder
-    ),
-  ];
+  // Removed _currentUser and _connectedUserIds as they are now passed from HomeScreen
   bool _isLoadingAuras = false; // Set to true to test loading state
 
   @override
   Widget build(BuildContext context) {
     final backgroundColor = Theme.of(context).scaffoldBackgroundColor; // Same as header/footer
 
-    return CustomScrollView(
+    // Create a AuraUser object from UserProfile for AuraBar
+    final aura_models.AuraUser? currentUserForAuraBar = widget.currentUserProfile != null
+        ? aura_models.AuraUser(
+            id: widget.currentUserProfile!.id,
+            name: widget.currentUserProfile!.displayName ?? widget.currentUserProfile!.username ?? 'You',
+            avatarUrl: widget.currentUserProfile!.avatarUrl,
+          )
+        : null;
+
+    return CustomScrollView( // Removed ScrollConfiguration wrapper
       slivers: [
-        SliverToBoxAdapter(
-          child: AuraBar(
-            isLoading: _isLoadingAuras,
-            allDisplayAuras: _allDisplayAuras,
-            currentUser: _currentUser,
-            connectedUserIds: _connectedUserIds,
+        if (currentUserForAuraBar != null) // Conditionally show AuraBar
+          SliverToBoxAdapter(
+            child: AuraBar(
+              currentUser: currentUserForAuraBar,
+              connectedUserIds: [], // AuraBar will fetch connected users internally
+            ),
           ),
-        ),
         SliverList(
           delegate: SliverChildBuilderDelegate(
             (context, index) {
