@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bharatconnect/models/user_profile_model.dart'; // Import UserProfile model
+import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
 
 class ProfileCard extends StatelessWidget {
   final UserProfile? initialProfileData;
@@ -20,15 +21,10 @@ class ProfileCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center, // Center align content
           children: [
-            CircleAvatar(
+            DefaultAvatar(
               radius: 40,
-              backgroundColor: Colors.grey, // Add a background color for the default avatar
-              backgroundImage: (initialProfileData?.avatarUrl != null && initialProfileData!.avatarUrl!.isNotEmpty)
-                  ? NetworkImage(initialProfileData!.avatarUrl!)
-                  : null,
-              child: (initialProfileData?.avatarUrl == null || initialProfileData!.avatarUrl!.isEmpty)
-                  ? const Icon(Icons.person, size: 50, color: Colors.white) // Add color to the icon
-                  : null,
+              avatarUrl: initialProfileData?.avatarUrl,
+              name: initialProfileData?.displayName ?? initialProfileData?.username,
             ),
             const SizedBox(height: 8),
             Text(

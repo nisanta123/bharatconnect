@@ -10,6 +10,7 @@ class UserProfile {
   String? phone;
   String? bio;
   String? activeKeyId; // For E2EE, if implemented later
+  String? activeAuraId; // New field to store the ID of the active aura
 
   UserProfile({
     required this.id,
@@ -21,6 +22,7 @@ class UserProfile {
     this.phone,
     this.bio,
     this.activeKeyId,
+    this.activeAuraId, // Include in constructor
   });
 
   // Factory constructor to create a UserProfile from a Firestore document
@@ -36,6 +38,7 @@ class UserProfile {
       phone: data['phone'] as String?,
       bio: data['bio'] as String?,
       activeKeyId: data['activeKeyId'] as String?,
+      activeAuraId: data['activeAuraId'] as String?, // Include in fromFirestore
     );
   }
 
@@ -50,6 +53,7 @@ class UserProfile {
       'phone': phone,
       'bio': bio,
       'activeKeyId': activeKeyId,
+      'activeAuraId': activeAuraId, // Include in toFirestore
     };
   }
 
@@ -62,6 +66,7 @@ class UserProfile {
     String? phone,
     String? bio,
     String? activeKeyId,
+    String? activeAuraId, // Include in copyWith
   }) {
     return UserProfile(
       id: id,
@@ -73,6 +78,7 @@ class UserProfile {
       phone: phone ?? this.phone,
       bio: bio ?? this.bio,
       activeKeyId: activeKeyId ?? this.activeKeyId,
+      activeAuraId: activeAuraId ?? this.activeAuraId, // Update activeAuraId
     );
   }
 }

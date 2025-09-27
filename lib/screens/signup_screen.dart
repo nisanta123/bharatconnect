@@ -5,7 +5,7 @@ import 'package:bharatconnect/models/user_profile_model.dart';
 import 'package:bharatconnect/main.dart'; // Import WhatsAppHome
 import 'package:bharatconnect/screens/login_screen.dart'; // Import LoginScreen
 import 'package:bharatconnect/widgets/logo.dart'; // Import the new Logo widget
-import 'package:bharatconnect/screens/profile_setup_screen.dart'; // Import ProfileSetupScreen
+import 'package:bharatconnect/screens/profile_setup_screen.dart' as ps_screen; // Add this import with prefix
 import 'package:bharatconnect/widgets/custom_toast.dart'; // Import CustomToast
 
 class SignupScreen extends StatefulWidget {
@@ -78,7 +78,7 @@ class _SignupScreenState extends State<SignupScreen> {
         if (userCredential.user != null) {
           print('SignupScreen: User created successfully: ${userCredential.user?.uid}');
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => ProfileSetupScreen(user: userCredential.user!)),
+            MaterialPageRoute(builder: (context) => ps_screen.ProfileSetupScreen(user: userCredential.user!)),
           );
         }
       } on FirebaseAuthException catch (e) {

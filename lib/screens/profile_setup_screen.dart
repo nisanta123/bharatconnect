@@ -9,6 +9,7 @@ import 'package:bharatconnect/widgets/logo.dart'; // Assuming you have a Logo wi
 import 'package:bharatconnect/models/user_profile_model.dart'; // Assuming UserProfile model
 import 'package:bharatconnect/screens/login_screen.dart'; // For logout navigation
 import 'package:bharatconnect/widgets/custom_toast.dart'; // Import CustomToast
+import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
 
 class ProfileSetupScreen extends StatefulWidget {
   final User user;
@@ -228,11 +229,6 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     try {
       await FirebaseFirestore.instance.collection("bharatConnectUsers").doc(authUid).set(profileDataToSave, SetOptions(merge: true));
 
-      showCustomToast(context, "Generating secure keys... Please wait, this is a one-time setup.");
-      // Assuming generateInitialKeyPair is a function you will implement elsewhere
-      // await generateInitialKeyPair(authUid);
-      showCustomToast(context, "Secure keys generated! Your account is now end-to-end encrypted.");
-
       // Update local user profile in AuthContext equivalent (placeholder)
       // setAuthUser(updatedProfileForContext);
 
@@ -337,17 +333,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          CircleAvatar(
+                          DefaultAvatar(
                             radius: 48,
-                            backgroundColor: Theme.of(context).colorScheme.surfaceVariant, // Muted background
-                            backgroundImage: _profilePicFile != null
-                                ? FileImage(_profilePicFile!)
-                                : (_profilePicPreviewUrl != null
-                                    ? NetworkImage(_profilePicPreviewUrl!)
-                                    : null) as ImageProvider<Object>?,
-                            child: _profilePicFile == null && _profilePicPreviewUrl == null
-                                ? Icon(Icons.person_2_outlined, size: 48, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)) // UserCircle2 equivalent
-                                : null,
+                            avatarUrl: _profilePicPreviewUrl,
+                            // The name parameter is optional, but can be passed if available
+                            // name: _displayNameController.text.isNotEmpty ? _displayNameController.text : null,
                           ),
                           Positioned.fill(
                             child: Container(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:bharatconnect/models/aura_models.dart' as aura_models; // Alias aura_models
 import 'package:google_fonts/google_fonts.dart'; // Import google_fonts
+import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
 
 class AuraRingItem extends StatefulWidget {
   final aura_models.AuraUser user; // Use AuraUser
@@ -44,14 +45,6 @@ class _AuraRingItemState extends State<AuraRingItem> with SingleTickerProviderSt
     final Color primaryColor = hasActiveAura && widget.activeAura!.auraStyle != null ? widget.activeAura!.auraStyle!.primaryColor : Colors.grey;
     final Color secondaryColor = hasActiveAura && widget.activeAura!.auraStyle != null ? widget.activeAura!.auraStyle!.secondaryColor : Colors.grey.shade700;
 
-    print('AuraRingItem: Building for user ${widget.user.name}');
-    print('AuraRingItem: hasActiveAura: $hasActiveAura');
-    if (hasActiveAura) {
-      print('AuraRingItem: Active Aura ID: ${widget.activeAura!.id}');
-      print('AuraRingItem: Aura Style: ${widget.activeAura!.auraStyle?.name}');
-      print('AuraRingItem: Aura Icon URL: ${widget.activeAura!.auraStyle?.iconUrl}');
-    }
-
     return GestureDetector(
       onTap: () {
         print('AuraRingItem: onClick triggered for ${widget.user.name}');
@@ -70,12 +63,11 @@ class _AuraRingItemState extends State<AuraRingItem> with SingleTickerProviderSt
                   AnimatedBuilder(
                     animation: _controller,
                     builder: (context, child) {
-                      print('AuraRingItem: Rendering AnimatedBuilder for gradient ring.');
                       return Transform.rotate(
                         angle: _controller.value * 2 * 3.141592653589793, // 2 * PI for a full circle
                         child: Container(
-                          width: 78, // Slightly larger than avatar
-                          height: 78,
+                          width: 74, // Slightly larger than avatar, reduced for thinner ring
+                          height: 74,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: LinearGradient(
@@ -91,15 +83,10 @@ class _AuraRingItemState extends State<AuraRingItem> with SingleTickerProviderSt
                       );
                     },
                   ),
-                CircleAvatar(
+                DefaultAvatar(
                   radius: 35, // Increased radius
-                  backgroundColor: hasActiveAura ? Theme.of(context).cardColor : Colors.grey.shade800, // Background color based on active aura
-                  backgroundImage: widget.user.avatarUrl != null && widget.user.avatarUrl!.isNotEmpty
-                      ? NetworkImage(widget.user.avatarUrl!)
-                      : null,
-                  child: widget.user.avatarUrl == null || widget.user.avatarUrl!.isEmpty
-                      ? Icon(Icons.person, size: 35, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)) // Increased icon size
-                      : null,
+                  avatarUrl: widget.user.avatarUrl,
+                  name: widget.user.name,
                 ),
                 if (widget.isCurrentUser && !hasActiveAura) // Show + icon only for current user if no active aura
                   Positioned(

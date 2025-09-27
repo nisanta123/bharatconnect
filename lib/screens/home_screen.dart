@@ -12,6 +12,7 @@ import 'package:bharatconnect/models/user_profile_model.dart'; // Add this impor
 import 'package:bharatconnect/widgets/logo.dart'; // Import the Logo widget
 import 'package:google_fonts/google_fonts.dart'; // Import google_fonts
 import 'package:bharatconnect/widgets/custom_toast.dart'; // Import CustomToast
+import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
 
 class HomeScreen extends StatefulWidget { // Renamed from WhatsAppHome
   const HomeScreen({super.key});
@@ -27,35 +28,44 @@ class _HomeScreenState extends State<HomeScreen> { // Renamed from _WhatsAppHome
 
   bool _isLoadingAuras = false; // Set to true to test loading state
 
-  final List<Widget> _widgetOptions = <Widget>[
-    ChatListScreen(),
-    SearchScreen(),
-    StatusScreen(),
-    CallsScreen(),
-    AccountScreen(),
-  ];
+  List<Widget> _widgetOptions = <Widget>[];
 
   @override
   void initState() {
     super.initState();
+    print('HomeScreen: initState called.'); // Updated print
     _pageController = PageController(initialPage: _selectedIndex);
     _fetchCurrentUserProfile(); // Fetch user profile on init
   }
 
   Future<void> _fetchCurrentUserProfile() async {
+    print('HomeScreen: _fetchCurrentUserProfile started.'); // Updated print
     final user = fb_auth.FirebaseAuth.instance.currentUser; // Use fb_auth.FirebaseAuth
     if (user != null) {
       final doc = await FirebaseFirestore.instance.collection('bharatConnectUsers').doc(user.uid).get();
       if (doc.exists) {
         setState(() {
           _currentUserProfile = UserProfile.fromFirestore(doc);
+          _widgetOptions = <Widget>[
+            ChatListScreen(currentUserProfile: _currentUserProfile), // Pass currentUserProfile
+            SearchScreen(currentUserId: _currentUserProfile!.id), // Pass current user ID
+            StatusScreen(),
+            CallsScreen(),
+            AccountScreen(),
+          ];
         });
+        print('HomeScreen: User profile fetched: ${_currentUserProfile?.displayName}'); // Updated print
+      } else {
+        print('HomeScreen: User profile not found in Firestore.'); // Updated print
       }
+    } else {
+      print('HomeScreen: No user logged in for _fetchCurrentUserProfile.'); // Updated print
     }
   }
 
   @override
   void dispose() {
+    print('HomeScreen: dispose called.'); // Updated print
     _pageController.dispose();
     super.dispose();
   }
@@ -73,8 +83,10 @@ class _HomeScreenState extends State<HomeScreen> { // Renamed from _WhatsAppHome
 
   @override
   Widget build(BuildContext context) {
+    print('HomeScreen: build method called. _currentUserProfile is null: ${_currentUserProfile == null}');
     // Display a loading indicator if user profile is not yet fetched
     if (_currentUserProfile == null) {
+      print('HomeScreen: Displaying CircularProgressIndicator because _currentUserProfile is null.');
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
@@ -95,27 +107,44 @@ class _HomeScreenState extends State<HomeScreen> { // Renamed from _WhatsAppHome
             icon: const Icon(Icons.notifications_none, color: Color(0xFFFAFAFA)), // Bell icon
             onPressed: () {},
           ),
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Color(0xFFFAFAFA)), // Three dots menu
-            onPressed: () {
-              showCustomToast(context, "More options clicked!"); // Trigger custom toast
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Color(0xFFFAFAFA)),
+            onSelected: (String result) async {
+              if (result == 'logout') {
+                await fb_auth.FirebaseAuth.instance.signOut();
+                // The StreamBuilder in main.dart will handle navigation after logout.
+              }
             },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+              const PopupMenuItem<String>(
+                value: 'logout',
+                child: Text('Logout'),
+              ),
+            ],
           ),
         ],
       ) : null, // AppBar is null for other pages
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        children: _widgetOptions.map((widgetOption) {
-          if (widgetOption is ChatListScreen) {
-            return ChatListScreen(currentUserProfile: _currentUserProfile); // Pass currentUserProfile
-          }
-          return widgetOption;
-        }).toList(),
+      body: Column(
+        children: [
+          Expanded(
+            child: PageView(
+              controller: _pageController,
+              onPageChanged: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+              },
+              children: _widgetOptions.map((widgetOption) {
+                if (widgetOption is ChatListScreen) {
+                  return ChatListScreen(currentUserProfile: _currentUserProfile); // Pass currentUserProfile
+                } else if (widgetOption is SearchScreen) {
+                  return SearchScreen(currentUserId: _currentUserProfile!.id); // Pass current user ID
+                }
+                return widgetOption;
+              }).toList(),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: Container(
         decoration: BoxDecoration(

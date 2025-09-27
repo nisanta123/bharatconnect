@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bharatconnect/models/search_models.dart'; // For User model
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum MessageType {
   text,
@@ -123,6 +124,53 @@ class Chat {
     this.typingStatus,
     this.chatSpecificPresence,
   });
+
+  factory Chat.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Chat(
+      id: doc.id,
+      type: data['type'] as String,
+      participants: List<String>.from(data['participants'] as List),
+      participantInfo: (data['participantInfo'] as Map<String, dynamic>).map(
+        (key, value) => MapEntry(key, ParticipantInfo(
+          name: value['name'] as String,
+          avatarUrl: value['avatarUrl'] as String?,
+          currentAuraId: value['currentAuraId'] as String?,
+          hasActiveUnviewedStatus: value['hasActiveUnviewedStatus'] as bool? ?? false,
+          hasActiveViewedStatus: value['hasActiveViewedStatus'] as bool? ?? false,
+        )),
+      ),
+      lastMessage: data['lastMessage'] != null
+          ? Message(
+              id: data['lastMessage']['id'] as String,
+              chatId: data['lastMessage']['chatId'] as String,
+              senderId: data['lastMessage']['senderId'] as String,
+              timestamp: data['lastMessage']['timestamp'] as int,
+              type: MessageType.values.firstWhere((e) => e.toString() == data['lastMessage']['type']),
+              readBy: List<String>.from(data['lastMessage']['readBy'] as List),
+              text: data['lastMessage']['text'] as String?,
+            ) // Simplified Message parsing
+          : null,
+      updatedAt: data['updatedAt'] as int,
+      contactUserId: data['contactUserId'] as String?,
+      requestStatus: data['requestStatus'] != null
+          ? ChatRequestStatus.values.firstWhere((e) => e.toString() == data['requestStatus'])
+          : null,
+      requesterId: data['requesterId'] as String?,
+      acceptedTimestamp: data['acceptedTimestamp'] as int?,
+      name: data['name'] as String?,
+      avatarUrl: data['avatarUrl'] as String?,
+      typingStatus: (data['typingStatus'] as Map<String, dynamic>?)?.map(
+        (key, value) => MapEntry(key, value as bool),
+      ),
+      chatSpecificPresence: (data['chatSpecificPresence'] as Map<String, dynamic>?)?.map(
+        (key, value) => MapEntry(key, ChatSpecificPresence(
+          state: value['state'] as String,
+          lastChanged: value['lastChanged'] as int,
+        )),
+      ),
+    );
+  }
 
   Chat copyWith({
     String? id,

@@ -3,6 +3,7 @@ import 'package:bharatconnect/widgets/aura_bar.dart';
 import 'package:bharatconnect/models/aura_models.dart' as aura_models; // Alias aura_models
 import 'package:bharatconnect/screens/chat_page.dart'; // Corrected import path
 import 'package:bharatconnect/models/user_profile_model.dart'; // Import UserProfile
+import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
 
 class ChatListScreen extends StatefulWidget {
   final UserProfile? currentUserProfile; // Accept currentUserProfile
@@ -122,15 +123,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 child: ListTile(
                   tileColor: backgroundColor, // Force same background for tile
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                  leading: CircleAvatar(
+                  leading: DefaultAvatar(
                     radius: 28, // Increased from 25
-                    backgroundColor: Colors.grey, // Consistent grey background
-                    backgroundImage: chat['avatarUrl'] != null && chat['avatarUrl']!.isNotEmpty
-                        ? NetworkImage(chat['avatarUrl']!)
-                        : null,
-                    child: chat['avatarUrl'] == null || chat['avatarUrl']!.isEmpty
-                        ? const Icon(Icons.person, color: Colors.white, size: 35) // Adjusted icon size
-                        : null,
+                    avatarUrl: chat['avatarUrl'],
+                    name: chat['name'],
                   ),
                   title: Text(
                     chat['name']!,

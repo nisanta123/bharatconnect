@@ -45,7 +45,7 @@ class FirestoreAura {
     return FirestoreAura(
       userId: data['userId'] as String,
       auraOptionId: data['auraOptionId'] as String,
-      createdAt: data['createdAt'] as Timestamp,
+      createdAt: data['createdAt'] as Timestamp? ?? Timestamp.now(), // Handle null createdAt
     );
   }
 

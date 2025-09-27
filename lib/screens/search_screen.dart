@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:bharatconnect/models/search_models.dart';
+import 'package:bharatconnect/services/user_service.dart';
+import 'package:bharatconnect/models/aura_models.dart';
+import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final String currentUserId;
+  const SearchScreen({super.key, required this.currentUserId});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -10,29 +15,10 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final UserService _userService = UserService();
   List<SearchResultUser> _searchResults = [];
   bool _isSearching = false;
-
-  // Mock data for demonstration
-  final User _currentUser = User(id: '1', name: 'You', avatarUrl: 'https://via.placeholder.com/150/FF0000/FFFFFF?text=U');
-  final List<SearchResultUser> _mockSearchResults = [
-    SearchResultUser(
-      id: '2', name: 'Alice', username: 'alice_u', avatarUrl: 'https://via.placeholder.com/150/0000FF/FFFFFF?text=A',
-      requestUiStatus: UserRequestStatus.idle,
-    ),
-    SearchResultUser(
-      id: '3', name: 'Bob', username: 'bob_u', avatarUrl: 'https://via.placeholder.com/150/00FF00/FFFFFF?text=B',
-      requestUiStatus: UserRequestStatus.request_sent,
-    ),
-    SearchResultUser(
-      id: '4', name: 'Charlie', username: 'charlie_u', avatarUrl: 'https://via.placeholder.com/150/FFFF00/000000?text=C',
-      requestUiStatus: UserRequestStatus.chat_exists,
-    ),
-    SearchResultUser(
-      id: '5', name: 'David', username: 'david_u', avatarUrl: 'https://via.placeholder.com/150/FF00FF/FFFFFF?text=D',
-      requestUiStatus: UserRequestStatus.on_cooldown, cooldownEndsAt: DateTime.now().add(const Duration(minutes: 5)).millisecondsSinceEpoch,
-    ),
-  ];
+  Timer? _debounceTimer;
 
   @override
   void initState() {
@@ -44,22 +30,78 @@ class _SearchScreenState extends State<SearchScreen> {
   void dispose() {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
   void _onSearchChanged() {
-    // For now, just update the UI with mock results based on search term presence
-    setState(() {
-      _isSearching = _searchController.text.isNotEmpty;
-      if (_searchController.text.isNotEmpty) {
-        _searchResults = _mockSearchResults.where((user) =>
-            user.name.toLowerCase().contains(_searchController.text.toLowerCase()) ||
-            (user.username?.toLowerCase().contains(_searchController.text.toLowerCase()) ?? false)
-        ).toList();
-      } else {
-        _searchResults = [];
-      }
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _performSearch(_searchController.text);
     });
+  }
+
+  Future<void> _performSearch(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    print('SearchScreen: Performing search for query: $query');
+    final fetchedUsers = await _userService.searchUsers(query);
+    print('SearchScreen: Fetched ${fetchedUsers.length} users.');
+    final List<SearchResultUser> results = [];
+
+    for (var user in fetchedUsers) {
+      print('SearchScreen: Processing user: ${user.name} (ID: ${user.id})');
+      UserRequestStatus status = UserRequestStatus.idle; // Default status
+      try {
+        status = await _userService.getChatStatus(widget.currentUserId, user.id);
+        print('SearchScreen: Chat status for ${user.name}: $status');
+      } catch (e) {
+        print('SearchScreen: Error getting chat status for ${user.name}: $e');
+        // Optionally, set an error status or skip this user
+      }
+
+      results.add(SearchResultUser(
+        id: user.id,
+        name: user.name,
+        username: user.username, // Ensure username is passed
+        email: user.email, // Ensure email is passed
+        avatarUrl: user.avatarUrl,
+        requestUiStatus: status,
+        // cooldownEndsAt: ... (implement cooldown logic if needed)
+      ));
+      print('SearchScreen: Added ${user.name} to search results.');
+    }
+
+    setState(() {
+      _searchResults = results;
+      _isSearching = false;
+    });
+    print('SearchScreen: Search finished. Displaying ${results.length} results.');
+  }
+
+  Future<void> _sendChatRequest(String targetUserId) async {
+    try {
+      await _userService.sendChatRequest(widget.currentUserId, targetUserId);
+      // After sending, refresh the search results to update the button status
+      await _performSearch(_searchController.text);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chat request sent!')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to send request: $e')),
+      );
+    }
   }
 
   String _formatCooldownTime(int endTimeMillis) {
@@ -80,7 +122,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildActionButton(SearchResultUser user) {
-    if (user.id == _currentUser.id) {
+    if (user.id == widget.currentUserId) {
       return ElevatedButton(
         onPressed: null,
         style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.secondaryContainer),
@@ -105,7 +147,7 @@ class _SearchScreenState extends State<SearchScreen> {
       case UserRequestStatus.chat_exists:
         return OutlinedButton(
           onPressed: () {
-            // Handle open chat
+            // Handle open chat - navigate to chat page
             print('Open chat with ${user.name}');
           },
           style: OutlinedButton.styleFrom(
@@ -116,16 +158,28 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       case UserRequestStatus.idle:
       default:
-        return ElevatedButton.icon(
-          onPressed: () {
-            // Handle send request
-            print('Send request to ${user.name}');
-          },
-          icon: const Icon(Icons.send, size: 16),
-          label: const Text('Send Request'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+        return Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [
+                Color(0xFF42A5F5), // Primary Blue
+                Color(0xFFAB47BC), // Accent Violet
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(8.0), // Match button border radius
+          ),
+          child: ElevatedButton.icon(
+            onPressed: () => _sendChatRequest(user.id),
+            icon: const Icon(Icons.send, size: 16),
+            label: const Text('Send Request'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent, // Make button background transparent
+              foregroundColor: Colors.white, // Ensure text/icon color is white for contrast
+              shadowColor: Colors.transparent, // Remove shadow to show gradient fully
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
+            ),
           ),
         );
     }
@@ -196,14 +250,10 @@ class _SearchScreenState extends State<SearchScreen> {
                               padding: const EdgeInsets.all(8.0),
                               child: Row(
                                 children: [
-                                  CircleAvatar(
+                                  DefaultAvatar(
                                     radius: 24,
-                                    backgroundImage: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-                                        ? NetworkImage(user.avatarUrl!)
-                                        : null,
-                                    child: user.avatarUrl == null || user.avatarUrl!.isEmpty
-                                        ? const Icon(Icons.person, size: 30)
-                                        : null,
+                                    avatarUrl: user.avatarUrl,
+                                    name: user.name,
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(

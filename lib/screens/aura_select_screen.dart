@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:bharatconnect/models/user_profile_model.dart'; // Import UserProfile
 import 'package:collection/collection.dart'; // For firstWhereOrNull
 import 'dart:async'; // Import for StreamSubscription
+import 'package:bharatconnect/services/aura_service.dart'; // Import AuraService
 
 class AuraSelectScreen extends StatefulWidget {
   const AuraSelectScreen({super.key});
@@ -23,6 +24,7 @@ class _AuraSelectScreenState extends State<AuraSelectScreen> {
   bool _isSavingAura = false;
   String? _errorMessage;
   StreamSubscription? _auraSubscription; // Declare StreamSubscription
+  final AuraService _auraService = AuraService(); // Create an instance of AuraService
 
   @override
   void initState() {
@@ -55,53 +57,18 @@ class _AuraSelectScreenState extends State<AuraSelectScreen> {
         _currentUserProfile = UserProfile.fromFirestore(userDoc);
       }
 
-      // Then listen for aura changes
-      _auraSubscription = FirebaseFirestore.instance // Assign to _auraSubscription
-          .collection('auras')
-          .doc(user.uid)
-          .snapshots()
+      // Then listen for aura changes using AuraService
+      _auraSubscription = _auraService.getConnectedUsersAuras([user.uid])
           .listen(
-            (docSnapshot) {
+            (activeAuras) {
               if (!mounted) return; // Check if mounted before calling setState
 
-              if (docSnapshot.exists) {
-                final firestoreAura = FirestoreAura.fromFirestore(docSnapshot);
-                final now = DateTime.now();
-                final createdAt = firestoreAura.createdAt.toDate();
-                final expiresAt = createdAt.add(const Duration(hours: 1));
+              final currentUserActiveAura = activeAuras.firstWhereOrNull((aura) => aura.userId == user.uid);
 
-                if (now.isBefore(expiresAt)) {
-                  // Aura is still active
-                  final matchingAuraOption = AURA_OPTIONS.firstWhereOrNull(
-                    (option) => option.id == firestoreAura.auraOptionId,
-                  );
-                  setState(() {
-                    _activeUserAura = DisplayAura(
-                      id: docSnapshot.id,
-                      userId: firestoreAura.userId,
-                      userName: _currentUserProfile?.displayName ?? _currentUserProfile?.username ?? 'You',
-                      userProfileAvatarUrl: _currentUserProfile?.avatarUrl,
-                      auraOptionId: firestoreAura.auraOptionId,
-                      createdAt: createdAt,
-                      auraStyle: matchingAuraOption,
-                    );
-                    _isLoading = false;
-                  });
-                } else {
-                  // Aura has expired, delete it from Firestore
-                  _clearAuraFromFirestore(user.uid);
-                  setState(() {
-                    _activeUserAura = null;
-                    _isLoading = false;
-                  });
-                }
-              } else {
-                // No active aura
-                setState(() {
-                  _activeUserAura = null;
-                  _isLoading = false;
-                });
-              }
+              setState(() {
+                _activeUserAura = currentUserActiveAura;
+                _isLoading = false;
+              });
             },
             onError: (error) { // Corrected onError handling
               if (!mounted) return; // Check if mounted before calling setState
@@ -131,15 +98,6 @@ class _AuraSelectScreenState extends State<AuraSelectScreen> {
     }
   }
 
-  Future<void> _clearAuraFromFirestore(String userId) async {
-    try {
-      await FirebaseFirestore.instance.collection('auras').doc(userId).delete();
-      print('Aura document deleted for $userId');
-    } catch (e) {
-      print('Error deleting expired aura: $e');
-    }
-  }
-
   Future<void> _handleSetAura(UserAura selectedAura) async {
     setState(() {
       _isSavingAura = true;
@@ -155,15 +113,7 @@ class _AuraSelectScreenState extends State<AuraSelectScreen> {
     }
 
     try {
-      final firestoreAura = FirestoreAura(
-        userId: user.uid,
-        auraOptionId: selectedAura.id,
-        createdAt: Timestamp.now(),
-      );
-      await FirebaseFirestore.instance
-          .collection('auras')
-          .doc(user.uid)
-          .set(firestoreAura.toFirestore());
+      await _auraService.setActiveAura(user.uid, selectedAura.id);
 
       showCustomToast(context, 'Aura set to ${selectedAura.name}!');
       Navigator.of(context).pop(); // Go back to previous screen
@@ -195,7 +145,7 @@ class _AuraSelectScreenState extends State<AuraSelectScreen> {
     }
 
     try {
-      await FirebaseFirestore.instance.collection('auras').doc(user.uid).delete();
+      await _auraService.clearActiveAura(user.uid);
       showCustomToast(context, 'Aura cleared!');
     } on FirebaseException catch (e) {
       _errorMessage = 'Failed to clear aura: ${e.message}';

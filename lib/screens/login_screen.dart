@@ -35,6 +35,10 @@ class _LoginScreenState extends State<LoginScreen> {
           email: _email,
           password: _password,
         );
+        // After successful login, navigate to the main app screen and clear the navigation stack.
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const MyApp()),
+        );
       } on FirebaseAuthException catch (e) {
         String message;
         if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
