@@ -1,6 +1,7 @@
 enum UserRequestStatus {
   idle,
   request_sent,
+  request_received, // Added new status
   chat_exists,
   is_self,
   on_cooldown,

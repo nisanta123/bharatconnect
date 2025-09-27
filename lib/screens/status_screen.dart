@@ -139,10 +139,11 @@ class _StatusScreenState extends State<StatusScreen> with SingleTickerProviderSt
                                   bottom: 0,
                                   right: 0,
                                   child: GestureDetector(
-                                    onTap: () {
-                                      Navigator.of(context).push(MaterialPageRoute(
+                                    onTap: () async { // Made the onTap callback async
+                                      await Navigator.of(context).push(MaterialPageRoute(
                                         builder: (context) => const CreateTextStatusScreen(),
                                       ));
+                                      _fetchInitialData(); // Call _fetchInitialData to refresh statuses
                                     },
                                     child: Container(
                                       decoration: const BoxDecoration(

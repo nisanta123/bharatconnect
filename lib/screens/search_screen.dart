@@ -141,8 +141,21 @@ class _SearchScreenState extends State<SearchScreen> {
       case UserRequestStatus.request_sent:
         return ElevatedButton(
           onPressed: null,
-          style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.secondaryContainer),
+          style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.6)), // Added opacity for fade effect
           child: const Text('Request Sent', style: TextStyle(color: Colors.white70)),
+        );
+      case UserRequestStatus.request_received:
+        return OutlinedButton(
+          onPressed: () {
+            // Handle accepting the chat request
+            print('Accept chat request from ${user.name}');
+            // You would typically call a service method here to accept the request
+          },
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: Theme.of(context).colorScheme.tertiary), // Use a different color for received requests
+            foregroundColor: Theme.of(context).colorScheme.tertiary,
+          ),
+          child: const Text('Accept Request'),
         );
       case UserRequestStatus.chat_exists:
         return OutlinedButton(

@@ -80,39 +80,51 @@ class UserService {
   }
 
   Future<UserRequestStatus> getChatStatus(String currentUserId, String targetUserId) async {
-    if (currentUserId == targetUserId) {
-      return UserRequestStatus.is_self;
+    final firestore = FirebaseFirestore.instance;
+
+    // If the target is self
+    if (currentUserId == targetUserId) return UserRequestStatus.is_self;
+
+    try {
+      // 1️⃣ Check if current user has sent a request
+      final sentSnapshot = await firestore
+          .collection('bharatConnectUsers')
+          .doc(currentUserId)
+          .collection('requestsSent')
+          .doc(targetUserId)
+          .get();
+
+      if (sentSnapshot.exists) return UserRequestStatus.request_sent;
+
+      // 2️⃣ Check if current user has received a request
+      final receivedSnapshot = await firestore
+          .collection('bharatConnectUsers')
+          .doc(currentUserId)
+          .collection('requestsReceived')
+          .doc(targetUserId)
+          .get();
+
+      if (receivedSnapshot.exists) return UserRequestStatus.request_received;
+
+      // 3️⃣ Check if a chat already exists between the two users
+      final chatQuery = await firestore
+          .collection('chats')
+          .where('participants', arrayContains: currentUserId)
+          .get();
+
+      final chatExists = chatQuery.docs.any((doc) {
+        final participants = List<String>.from(doc['participants']);
+        return participants.contains(targetUserId);
+      });
+
+      if (chatExists) return UserRequestStatus.chat_exists;
+
+      // 4️⃣ If none of the above, user is idle
+      return UserRequestStatus.idle;
+
+    } catch (e) {
+      print('Error getting chat status: $e');
+      return UserRequestStatus.idle;
     }
-
-    // Check if a chat already exists
-    final existingChat = await _firestore
-        .collection('chats')
-        .where('participants', arrayContains: currentUserId)
-        .get();
-
-    for (var doc in existingChat.docs) {
-      final chat = Chat.fromFirestore(doc); // Assuming a fromFirestore factory for Chat
-      if (chat.participants.contains(targetUserId)) {
-        return UserRequestStatus.chat_exists;
-      }
-    }
-
-    // Check if a request has been sent by the current user to the target user
-    final sentRequest = await _firestore
-        .collection('bharatConnectUsers') // Changed to bharatConnectUsers
-        .doc(currentUserId)
-        .collection('requestsSent')
-        .doc(targetUserId)
-        .get();
-
-    if (sentRequest.exists) {
-      return UserRequestStatus.request_sent;
-    }
-
-    // Check for cooldown (this would require a more complex logic,
-    // for now, we'll assume no cooldown if no request sent or chat exists)
-    // You would typically store cooldown information in the user's document
-    // or in the request document itself.
-    return UserRequestStatus.idle;
   }
 }
