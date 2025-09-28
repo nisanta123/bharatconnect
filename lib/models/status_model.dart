@@ -22,14 +22,18 @@ class Status {
 
   factory Status.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    return Status.fromMap(data, doc.id);
+  }
+
+  factory Status.fromMap(Map<String, dynamic> data, String id) {
     return Status(
-      id: doc.id,
+      id: id,
       userId: data['userId'] as String,
       text: data['text'] as String,
       fontFamily: data['fontFamily'] as String?,
       backgroundColor: data['backgroundColor'] as String?,
-      createdAt: data['createdAt'] as Timestamp,
-      expiresAt: data['expiresAt'] as Timestamp,
+      createdAt: data['createdAt'] is Timestamp ? data['createdAt'] as Timestamp : Timestamp.fromMillisecondsSinceEpoch(data['createdAt'] as int),
+      expiresAt: data['expiresAt'] is Timestamp ? data['expiresAt'] as Timestamp : Timestamp.fromMillisecondsSinceEpoch(data['expiresAt'] as int),
     );
   }
 

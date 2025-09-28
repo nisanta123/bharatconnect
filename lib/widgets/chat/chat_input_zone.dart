@@ -8,6 +8,7 @@ class ChatInputZone extends StatelessWidget {
   final bool isEmojiPickerOpen;
   final ValueChanged<dynamic> onFileSelect; // Placeholder for File
   final TextEditingController? textareaRef; // Placeholder for TextEditingController
+  final FocusNode? focusNode; // Add FocusNode
   final bool isDisabled;
   final bool justSelectedEmoji;
   final String? filePreviewUrl;
@@ -22,6 +23,7 @@ class ChatInputZone extends StatelessWidget {
     required this.isEmojiPickerOpen,
     required this.onFileSelect,
     this.textareaRef,
+    this.focusNode, // Initialize FocusNode
     this.isDisabled = false,
     this.justSelectedEmoji = false,
     this.filePreviewUrl,
@@ -77,6 +79,7 @@ class ChatInputZone extends StatelessWidget {
               Expanded(
                 child: TextField(
                   controller: textareaRef, // Use the provided controller
+                  focusNode: focusNode, // Assign the FocusNode
                   decoration: InputDecoration(
                     hintText: 'Type a message',
                     border: OutlineInputBorder(

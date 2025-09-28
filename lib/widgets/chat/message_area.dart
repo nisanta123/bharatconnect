@@ -1,92 +1,76 @@
 import 'package:flutter/material.dart';
 import 'package:bharatconnect/models/chat_models.dart'; // For Message model
+import 'package:bharatconnect/services/encryption_service.dart'; // Import EncryptionService
+import 'package:bharatconnect/widgets/chat/message_bubble.dart'; // Corrected import path for MessageBubble
 
-class MessageArea extends StatelessWidget { // Changed to StatelessWidget
+class MessageArea extends StatelessWidget {
   final List<Message> messages;
   final String currentUserId;
   final String? contactId;
-  final double dynamicPaddingBottom;
   final bool isContactTyping;
   final ScrollController scrollController;
+  final EdgeInsets? padding;
+  final EncryptionService encryptionService; // Add this line
 
   const MessageArea({
     super.key,
     required this.messages,
     required this.currentUserId,
     this.contactId,
-    required this.dynamicPaddingBottom,
     required this.isContactTyping,
     required this.scrollController,
+    this.padding,
+    required this.encryptionService, // Add this line
   });
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final maxBubbleWidth = screenWidth * 0.7; // 70% of screen width
+    final maxBubbleWidth = screenWidth * 0.85; // 85% of screen width
 
-    return Expanded(
-      child: ScrollConfiguration(
-        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false), // Hide scrollbar
-        child: ListView.builder(
-          controller: scrollController, // Assign the scroll controller
-          padding: EdgeInsets.only(bottom: dynamicPaddingBottom),
-          itemCount: messages.length + (isContactTyping ? 1 : 0), // Use messages.length
-          itemBuilder: (context, index) {
-            if (index < messages.length) {
-              final message = messages[index];
-              final isMe = message.senderId == currentUserId;
-              return Align(
-                alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: maxBubbleWidth), // Constrain message bubble width
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: isMe ? null : Colors.grey[800], // Set received message color to slightly different gray
-                      borderRadius: BorderRadius.circular(12.0),
-                      gradient: isMe
-                          ? const LinearGradient(
-                              colors: [
-                                Color(0xFF42A5F5), // Primary Blue
-                                Color(0xFFAB47BC), // Accent Violet
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            )
-                          : null, // Apply gradient for own messages
-                    ),
-                    child: Text(
-                      message.text ?? '',
-                      style: TextStyle(color: isMe ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface),
-                    ),
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false), // Hide scrollbar
+      child: ListView.builder(
+        controller: scrollController,
+        reverse: true, // 🔑 newest message starts at bottom
+        physics: const BouncingScrollPhysics(), // Add BouncingScrollPhysics
+        padding: (padding ?? EdgeInsets.zero).copyWith(left: 8.0, right: 8.0), // Add horizontal padding
+        itemCount: messages.length + (isContactTyping ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index < messages.length) {
+            final message = messages[index];
+            final isMe = message.senderId == currentUserId;
+            return MessageBubble(
+              key: ValueKey(message.id), // 🔑 avoids flicker on rebuild
+              message: message,
+              isMe: isMe,
+              maxBubbleWidth: maxBubbleWidth,
+              encryptionService: encryptionService,
+              currentUserId: currentUserId,
+            );
+          } else if (isContactTyping) {
+            // Typing indicator should appear at the very bottom (top of reversed list)
+            return Align(
+              alignment: Alignment.centerLeft,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: screenWidth * 0.85), // Constrain typing indicator width to 85%
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                  padding: const EdgeInsets.all(10.0),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[800], // Consistent received message color
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  child: const Text(
+                    'Typing...',
+                    style: TextStyle(color: Colors.grey),
                   ),
                 ),
-              );
-            } else if (isContactTyping) {
-              // Typing indicator
-              return Align(
-                alignment: Alignment.centerLeft,
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7), // Constrain typing indicator width
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[800], // Consistent received message color
-                      borderRadius: BorderRadius.circular(12.0),
-                    ),
-                    child: const Text(
-                      'Typing...',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                ),
-              );
-            }
-            return const SizedBox.shrink();
-          },
-        ),
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        },
       ),
     );
   }

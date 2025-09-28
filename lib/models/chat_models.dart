@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:bharatconnect/models/search_models.dart'; // For User model
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert'; // Import jsonDecode
 
 enum MessageType {
   text,
   image,
   system,
+}
+
+enum MessageStatus {
+  sending,
+  sent,
+  delivered,
+  read,
+  failed,
 }
 
 enum ChatRequestStatus {
@@ -47,8 +56,10 @@ class Message {
   final String? encryptedText;
   final Map<String, dynamic>? encryptedKeys;
   final String? keyId;
+  String? decryptedText; // Add this line
+  MessageStatus status; // Add message status
 
-  const Message({
+  Message({
     required this.id,
     this.clientTempId,
     required this.chatId,
@@ -63,7 +74,111 @@ class Message {
     this.encryptedText,
     this.encryptedKeys,
     this.keyId,
+    this.decryptedText, // Initialize decryptedText
+    this.status = MessageStatus.sending, // Default status
   });
+
+  Message copyWith({
+    String? id,
+    String? clientTempId,
+    String? chatId,
+    String? senderId,
+    int? timestamp,
+    MessageType? type,
+    List<String>? readBy,
+    String? text,
+    MediaInfo? mediaInfo,
+    String? error,
+    String? iv,
+    String? encryptedText,
+    Map<String, dynamic>? encryptedKeys,
+    String? keyId,
+    String? decryptedText,
+    MessageStatus? status,
+  }) {
+    return Message(
+      id: id ?? this.id,
+      clientTempId: clientTempId ?? this.clientTempId,
+      chatId: chatId ?? this.chatId,
+      senderId: senderId ?? this.senderId,
+      timestamp: timestamp ?? this.timestamp,
+      type: type ?? this.type,
+      readBy: readBy ?? this.readBy,
+      text: text ?? this.text,
+      mediaInfo: mediaInfo ?? this.mediaInfo,
+      error: error ?? this.error,
+      iv: iv ?? this.iv,
+      encryptedText: encryptedText ?? this.encryptedText,
+      encryptedKeys: encryptedKeys ?? this.encryptedKeys,
+      keyId: keyId ?? this.keyId,
+      decryptedText: decryptedText ?? this.decryptedText, // Copy decryptedText
+      status: status ?? this.status,
+    );
+  }
+
+  Map<String, dynamic> toFirestoreMap() {
+    return {
+      'id': id,
+      'clientTempId': clientTempId,
+      'chatId': chatId,
+      'senderId': senderId,
+      'timestamp': timestamp,
+      'type': type.toString(),
+      'readBy': readBy,
+      'text': text,
+      'mediaInfo': mediaInfo != null
+          ? {
+              'fileName': mediaInfo!.fileName,
+              'fileType': mediaInfo!.fileType,
+              'fileId': mediaInfo!.fileId,
+              'thumbnailUrl': mediaInfo!.thumbnailUrl,
+              'fileSize': mediaInfo!.fileSize,
+            }
+          : null,
+      'error': error,
+      'iv': iv,
+      'encryptedText': encryptedText,
+      'encryptedKeys': encryptedKeys,
+      'keyId': keyId,
+      'status': status.toString(), // Include status
+    };
+  }
+
+  factory Message.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return Message.fromMap(data, doc.id);
+  }
+
+  factory Message.fromMap(Map<String, dynamic> data, String id) {
+    return Message(
+      id: id,
+      clientTempId: data['clientTempId'] as String?,
+      chatId: data['chatId'] as String,
+      senderId: data['senderId'] as String,
+      timestamp: data['timestamp'] as int,
+      type: MessageType.values.firstWhere((e) => e.toString() == data['type']),
+      readBy: List<String>.from(data['readBy'] as List? ?? []),
+      text: data['text'] as String?,
+      mediaInfo: data['mediaInfo'] != null
+          ? MediaInfo(
+              fileName: data['mediaInfo']['fileName'] as String,
+              fileType: data['mediaInfo']['fileType'] as String,
+              fileId: data['mediaInfo']['fileId'] as String,
+              thumbnailUrl: data['mediaInfo']['thumbnailUrl'] as String?,
+              fileSize: data['mediaInfo']['fileSize'] as int?,
+            )
+          : null,
+      error: data['error'] as String?,
+      iv: data['iv'] as String?,
+      encryptedText: data['encryptedText'] as String?,
+      encryptedKeys: data['encryptedKeys'] as Map<String, dynamic>?,
+      keyId: data['keyId'] as String?,
+      decryptedText: null, // Initialize as null when creating from Firestore
+      status: data['status'] != null
+          ? MessageStatus.values.firstWhere((e) => e.toString() == data['status'], orElse: () => MessageStatus.sent)
+          : MessageStatus.sent, // Default to sent if status is not present
+    );
+  }
 }
 
 class ParticipantInfo {
@@ -127,11 +242,26 @@ class Chat {
 
   factory Chat.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    return Chat(
-      id: doc.id,
-      type: data['type'] as String,
-      participants: List<String>.from(data['participants'] as List),
-      participantInfo: (data['participantInfo'] as Map<String, dynamic>).map(
+    return Chat.fromMap(data, doc.id);
+  }
+
+  factory Chat.fromMap(Map<String, dynamic> data, String id) {
+    final dynamic participantsData = data['participants'];
+    List<String> parsedParticipants;
+
+    if (participantsData is String) {
+      parsedParticipants = List<String>.from(jsonDecode(participantsData) as List);
+    } else if (participantsData is List) {
+      parsedParticipants = List<String>.from(participantsData);
+    } else {
+      parsedParticipants = []; // Default to empty list
+    }
+
+    final dynamic participantInfoData = data['participantInfo'];
+    Map<String, ParticipantInfo> parsedParticipantInfo;
+
+    if (participantInfoData is String) {
+      parsedParticipantInfo = (jsonDecode(participantInfoData) as Map<String, dynamic>).map(
         (key, value) => MapEntry(key, ParticipantInfo(
           name: value['name'] as String,
           avatarUrl: value['avatarUrl'] as String?,
@@ -139,17 +269,30 @@ class Chat {
           hasActiveUnviewedStatus: value['hasActiveUnviewedStatus'] as bool? ?? false,
           hasActiveViewedStatus: value['hasActiveViewedStatus'] as bool? ?? false,
         )),
-      ),
+      );
+    } else if (participantInfoData is Map<String, dynamic>) {
+      parsedParticipantInfo = participantInfoData.map(
+        (key, value) => MapEntry(key, ParticipantInfo(
+          name: value['name'] as String,
+          avatarUrl: value['avatarUrl'] as String?,
+          currentAuraId: value['currentAuraId'] as String?,
+          hasActiveUnviewedStatus: value['hasActiveUnviewedStatus'] as bool? ?? false,
+          hasActiveViewedStatus: value['hasActiveViewedStatus'] as bool? ?? false,
+        )),
+      );
+    } else {
+      parsedParticipantInfo = {}; // Default to empty map
+    }
+
+    return Chat(
+      id: id,
+      type: data['type'] as String,
+      participants: parsedParticipants,
+      participantInfo: parsedParticipantInfo,
       lastMessage: data['lastMessage'] != null
-          ? Message(
-              id: data['lastMessage']['id'] as String,
-              chatId: data['lastMessage']['chatId'] as String,
-              senderId: data['lastMessage']['senderId'] as String,
-              timestamp: data['lastMessage']['timestamp'] as int,
-              type: MessageType.values.firstWhere((e) => e.toString() == data['lastMessage']['type']),
-              readBy: List<String>.from(data['lastMessage']['readBy'] as List),
-              text: data['lastMessage']['text'] as String?,
-            ) // Simplified Message parsing
+          ? (data['lastMessage'] is String
+              ? Message.fromMap(jsonDecode(data['lastMessage']) as Map<String, dynamic>, (jsonDecode(data['lastMessage']) as Map<String, dynamic>)['id'] as String)
+              : Message.fromMap(data['lastMessage'] as Map<String, dynamic>, data['lastMessage']['id'] as String))
           : null,
       updatedAt: data['updatedAt'] as int,
       contactUserId: data['contactUserId'] as String?,
@@ -171,6 +314,30 @@ class Chat {
       ),
     );
   }
+
+  String get lastMessageSenderId {
+    return lastMessage?.senderId ?? 'system';
+  }
+
+  Timestamp? get lastMessageTimestamp {
+    if (lastMessage != null) {
+      return Timestamp.fromMillisecondsSinceEpoch(lastMessage!.timestamp);
+    }
+    return null;
+  }
+
+  String? get lastMessageText {
+    return lastMessage?.text;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is Chat && other.id == id;
+  }
+
+  @override
+  int get hashCode => id.hashCode;
 
   Chat copyWith({
     String? id,
@@ -233,4 +400,49 @@ class FirestoreAura {
     required this.auraOptionId,
     required this.createdAt,
   });
+}
+
+class ChatRequest {
+  final String id;
+  final String senderId;
+  final String receiverId;
+  final ChatRequestStatus status;
+  final DateTime timestamp;
+
+  const ChatRequest({
+    required this.id,
+    required this.senderId,
+    required this.receiverId,
+    required this.status,
+    required this.timestamp,
+  });
+
+  factory ChatRequest.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return ChatRequest.fromMap(data, doc.id);
+  }
+
+  factory ChatRequest.fromMap(Map<String, dynamic> data, String id) {
+    final dynamic timestampData = data['timestamp'];
+    DateTime parsedTimestamp;
+
+    if (timestampData is int) {
+      parsedTimestamp = DateTime.fromMillisecondsSinceEpoch(timestampData);
+    } else if (timestampData is Timestamp) {
+      parsedTimestamp = timestampData.toDate();
+    } else {
+      // Fallback or throw an error if the type is unexpected
+      parsedTimestamp = DateTime.now(); // Or handle as an error
+    }
+
+    return ChatRequest(
+      id: id,
+      senderId: data['senderId'] as String,
+      receiverId: data['receiverId'] as String,
+      status: ChatRequestStatus.values.firstWhere(
+          (e) => e.toString() == data['status'],
+          orElse: () => ChatRequestStatus.pending),
+      timestamp: parsedTimestamp,
+    );
+  }
 }

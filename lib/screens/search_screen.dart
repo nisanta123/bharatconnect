@@ -4,6 +4,7 @@ import 'package:bharatconnect/models/search_models.dart';
 import 'package:bharatconnect/services/user_service.dart';
 import 'package:bharatconnect/models/aura_models.dart';
 import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
+import 'package:bharatconnect/screens/user_profile_screen.dart'; // Import UserProfileScreen
 
 class SearchScreen extends StatefulWidget {
   final String currentUserId;
@@ -257,38 +258,45 @@ class _SearchScreenState extends State<SearchScreen> {
                         itemBuilder: (context, index) {
                           final user = _searchResults[index];
                           final showUsername = user.username != null && user.username!.toLowerCase() != 'n/a';
-                          return Card(
-                            margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Row(
-                                children: [
-                                  DefaultAvatar(
-                                    radius: 24,
-                                    avatarUrl: user.avatarUrl,
-                                    name: user.name,
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          user.name,
-                                          style: Theme.of(context).textTheme.titleMedium,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (showUsername)
+                          return GestureDetector(
+                            onTap: () {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (context) => UserProfileScreen(userId: user.id, currentUserId: widget.currentUserId), // Pass currentUserId
+                              ));
+                            },
+                            child: Card(
+                              margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Row(
+                                  children: [
+                                    DefaultAvatar(
+                                      radius: 24,
+                                      avatarUrl: user.avatarUrl,
+                                      name: user.name,
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
                                           Text(
-                                            '@${user.username}',
-                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                                            user.name,
+                                            style: Theme.of(context).textTheme.titleMedium,
                                             overflow: TextOverflow.ellipsis,
                                           ),
-                                      ],
+                                          if (showUsername)
+                                            Text(
+                                              '@${user.username}',
+                                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  _buildActionButton(user),
-                                ],
+                                    _buildActionButton(user),
+                                  ],
+                                ),
                               ),
                             ),
                           );

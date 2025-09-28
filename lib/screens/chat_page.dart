@@ -1,95 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:bharatconnect/models/chat_models.dart';
-import 'package:bharatconnect/models/search_models.dart'; // For User model
+import 'package:bharatconnect/models/search_models.dart';
 import 'package:bharatconnect/widgets/chat/chat_page_header.dart';
 import 'package:bharatconnect/widgets/chat/message_area.dart';
 import 'package:bharatconnect/widgets/chat/chat_input_zone.dart';
 import 'package:bharatconnect/widgets/chat/chat_request_display.dart';
 import 'package:bharatconnect/widgets/chat/emoji_picker.dart';
 import 'package:bharatconnect/widgets/chat/encrypted_chat_banner.dart';
+import 'package:bharatconnect/services/user_service.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
+import 'package:bharatconnect/models/user_profile_model.dart';
+import 'package:bharatconnect/services/encryption_service.dart';
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:bharatconnect/widgets/chat/emoji_manager.dart'; // Import EmojiManager
 
-const double EMOJI_PICKER_HEIGHT_PX = 300.0;
-
-// Mock AURA_OPTIONS for now
-const List<UserAura> AURA_OPTIONS = [
-  UserAura(id: 'aura1', name: 'Fire', iconUrl: '🔥', primaryColor: Colors.red, secondaryColor: Colors.deepOrange),
-  UserAura(id: 'aura2', name: 'Water', iconUrl: '💧', primaryColor: Colors.blue, secondaryColor: Colors.lightBlue),
-  UserAura(id: 'aura3', name: 'Earth', iconUrl: '🌳', primaryColor: Colors.green, secondaryColor: Colors.lightGreen),
-];
-
-// Placeholder for generateChatId
-String generateChatId(String uid1, String uid2) {
-  if (uid1.compareTo(uid2) < 0) {
-    return '${uid1}_${uid2}';
-  } else {
-    return '${uid2}_${uid1}';
-  }
-}
-
-// Placeholder for timestampToMillisSafe
-int timestampToMillisSafe(dynamic timestamp, {int? defaultTimestamp}) {
-  if (timestamp is int) {
-    return timestamp;
-  }
-  // For now, just return current time or default if not int
-  return defaultTimestamp ?? DateTime.now().millisecondsSinceEpoch;
-}
-
-// Placeholder for encryption services
-Future<Map<String, dynamic>> encryptMessage(String text, List<String> recipientIds, String senderId) async {
-  return {
-    'encryptedText': 'encrypted($text)',
-    'keyId': 'mockKeyId',
-    'iv': 'mockIv',
-    'encryptedKeys': {},
-  };
-}
-
-Future<String> decryptMessage(Map<String, dynamic> messageData, String currentUserId) async {
-  return messageData['encryptedText']?.toString().replaceFirst('encrypted(', '').replaceFirst(')', '') ?? 'Decrypted message';
-}
-
-bool hasLocalKeys(String userId) => true; // Mock implementation
-
-Future<Map<String, dynamic>> encryptAndUploadChunks(dynamic file, String chatId, String senderId, List<String> recipientIds, Function(double) onProgress) async {
-  return {
-    'mediaInfo': MediaInfo(fileName: 'mock_image.jpg', fileType: 'image/jpeg', fileId: 'mockFileId'),
-    'encryptedAesKey': {},
-    'keyId': 'mockKeyId',
-  };
-}
+const double EMOJI_PICKER_HEIGHT_PX = 250.0;
 
 class ChatPage extends StatefulWidget {
   final String chatId;
+  final UserProfile? currentUserProfile;
 
-  const ChatPage({super.key, required this.chatId});
+  const ChatPage({Key? key, required this.chatId, this.currentUserProfile}) : super(key: key);
 
   @override
-  State<ChatPage> createState() => _ChatPageState();
+  _ChatPageState createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver { // Add WidgetsBindingObserver
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _messageFocusNode = FocusNode(); // Declare FocusNode
 
-  // Mock Auth and Chat Context values
-  final User _authUser = User(id: 'currentUserId', name: 'You', avatarUrl: null);
-  final bool _isAuthenticated = true;
-  final bool _isAuthLoading = false;
+  final UserService _userService = UserService(); // Initialize UserService
+  final EncryptionService _encryptionService = EncryptionService(); // Instantiate EncryptionService
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Initialize Firestore
 
-  // Mock Chat Context Hook
-  final List<Chat> _mockContextChats = []; // You can populate this with mock chats if needed
-  Chat? _getChatById(String id) => null; // Placeholder
+  User? _authUser; // Will be set from currentUserProfile
+  bool _isAuthenticated = false;
+  bool _isAuthLoading = true;
 
   // Page State
   bool _isPageLoading = true;
   bool _isChatReady = false;
   String? _effectiveChatId;
   Chat? _chatDetails;
-  User? _contact;
+  UserProfile? _contact;
   List<Message> _messages = [];
   String _newMessage = '';
-  bool _isEmojiPickerOpen = false;
+  late EmojiManager _emojiManager; // Declare EmojiManager
   dynamic _fileToSend; // Placeholder for File
   String? _filePreviewUrl;
   bool _isProcessingRequestAction = false;
@@ -97,23 +56,55 @@ class _ChatPageState extends State<ChatPage> {
   bool _isContactTyping = false;
   ChatSpecificPresence? _contactPresence;
   bool? _localKeysExist;
+  List<StreamSubscription> _requestSubscriptions = [];
+  bool _showEncryptionBanner = true; // Add this line
 
   @override
   void initState() {
     super.initState();
-    _localKeysExist = hasLocalKeys(_authUser.id);
+    WidgetsBinding.instance.addObserver(this); // Add observer
+    _emojiManager = EmojiManager(_messageFocusNode); // Initialize EmojiManager
+
+    _messageFocusNode.addListener(() {
+      if (_messageFocusNode.hasFocus && _emojiManager.isEmojiOpen) {
+        setState(() {
+          _emojiManager.isEmojiOpen = false;
+        });
+      }
+    });
+
+    // Automatically request focus on the message input when the chat page loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _messageFocusNode.requestFocus();
+    });
+
+    if (widget.currentUserProfile != null) {
+      _authUser = User(
+        id: widget.currentUserProfile!.id,
+        name: widget.currentUserProfile!.displayName ?? widget.currentUserProfile!.username ?? '',
+        avatarUrl: widget.currentUserProfile!.avatarUrl,
+      );
+      _isAuthenticated = true;
+    }
+    _isAuthLoading = false; // Set to false after auth check
+    // _localKeysExist = hasLocalKeys(_authUser!.id); // This will be handled by EncryptionService
     _initializeChat();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // Remove observer
     _messageController.dispose();
     _scrollController.dispose();
-    if (_filePreviewUrl != null) {
-      // URL.revokeObjectURL(_filePreviewUrl!); // Not applicable in Flutter
+    _messageFocusNode.dispose(); // Dispose FocusNode
+    for (var subscription in _requestSubscriptions) {
+      subscription.cancel();
     }
+    // _filePreviewUrl is just a string, no need to revoke in Flutter
     super.dispose();
   }
+
+  // Removed didChangeMetrics as it's no longer needed with reverse: true
 
   Future<void> _initializeChat() async {
     setState(() {
@@ -121,42 +112,110 @@ class _ChatPageState extends State<ChatPage> {
       _isChatReady = false;
     });
 
-    String determinedChatId = widget.chatId;
-    User? contactUserForChat;
-
-    // Mock logic for determining contact and chat ID
-    if (widget.chatId.startsWith('req_')) {
-      final contactIdFromRequestRoute = widget.chatId.split('_').last;
-      contactUserForChat = User(id: contactIdFromRequestRoute, name: 'Mock Contact', avatarUrl: null);
-      determinedChatId = generateChatId(_authUser.id, contactIdFromRequestRoute);
-    } else {
-      final contactIdFromStandardChatId = widget.chatId.split('_').firstWhere((id) => id != _authUser.id, orElse: () => '');
-      contactUserForChat = User(id: contactIdFromStandardChatId, name: 'Mock Contact', avatarUrl: null);
-      determinedChatId = widget.chatId;
+    if (_authUser == null) {
+      // Handle case where _authUser is not set (e.g., not logged in)
+      setState(() {
+        _isPageLoading = false;
+      });
+      return;
     }
 
-    setState(() {
-      _contact = contactUserForChat;
-      _effectiveChatId = determinedChatId;
-      _isChatReady = true;
-      _isPageLoading = false;
-      // Mock chat details
-      _chatDetails = Chat(
-        id: determinedChatId,
-        type: 'individual',
-        participants: [_authUser.id, _contact!.id],
-        participantInfo: {
-          _authUser.id: ParticipantInfo(name: _authUser.name, avatarUrl: _authUser.avatarUrl),
-          _contact!.id: ParticipantInfo(name: _contact!.name, avatarUrl: _contact!.avatarUrl),
-        },
-        updatedAt: DateTime.now().millisecondsSinceEpoch,
-        requestStatus: ChatRequestStatus.accepted,
-      );
-      _messages = [
-        Message(id: '1', chatId: determinedChatId, senderId: _contact!.id, timestamp: DateTime.now().subtract(const Duration(minutes: 5)).millisecondsSinceEpoch, type: MessageType.text, readBy: [_authUser.id], text: 'Hi there!'),
-        Message(id: '2', chatId: determinedChatId, senderId: _authUser.id, timestamp: DateTime.now().subtract(const Duration(minutes: 2)).millisecondsSinceEpoch, type: MessageType.text, readBy: [_contact!.id, _authUser.id], text: 'Hello!'),
-      ];
-    });
+    try {
+      // Check for local keys and generate if not present
+      _localKeysExist = await _encryptionService.hasLocalKeys(_authUser!.id);
+      if (!(_localKeysExist ?? false)) {
+        await _encryptionService.generateAndStoreKeys(_authUser!.id);
+        _localKeysExist = true; // Keys are now generated
+      }
+
+      // Fetch chat details
+      final chatStream = _userService.streamUserChats(_authUser!.id).map((chats) {
+        return chats.firstWhere((chat) => chat.id == widget.chatId, orElse: () => throw Exception('Chat not found'));
+      });
+
+      _requestSubscriptions.add(chatStream.listen((chat) async {
+        setState(() {
+          _chatDetails = chat;
+          _effectiveChatId = chat.id;
+        });
+
+        // Determine the other participant
+        final otherParticipantId = chat.participants.firstWhere(
+          (id) => id != _authUser!.id,
+          orElse: () => 'Unknown',
+        );
+
+        // Fetch contact user details
+        final contactUser = await _userService.getUserById(otherParticipantId);
+        setState(() {
+          _contact = contactUser;
+          _isChatReady = true;
+          _isPageLoading = false;
+        });
+
+        // Stream messages for the chat
+        _requestSubscriptions.add(
+          _userService.streamChatMessages(chat.id).listen((firestoreMessages) {
+            setState(() {
+              final Map<String, Message> finalMessagesMap = {};
+
+              // 1. Add all confirmed Firestore messages to the map.
+              // These are the authoritative versions, and their status should be 'sent'.
+              for (var firestoreMsg in firestoreMessages) {
+                finalMessagesMap[firestoreMsg.id] = firestoreMsg.copyWith(status: MessageStatus.sent);
+              }
+
+              // 2. Iterate through the *current* _messages list to preserve unconfirmed local messages.
+              for (var localMsg in _messages) {
+                if (localMsg.status == MessageStatus.sending || localMsg.status == MessageStatus.failed) {
+                  // Check if this local message has been confirmed by a Firestore message.
+                  // A Firestore message confirms a local one if it has the same clientTempId.
+                  final bool isConfirmedByFirestore = firestoreMessages.any(
+                    (fm) => localMsg.clientTempId != null && fm.clientTempId == localMsg.clientTempId,
+                  );
+
+                  if (!isConfirmedByFirestore) {
+                    // If the local sending/failed message is NOT yet confirmed by Firestore,
+                    // keep it in the map. Use clientTempId as key to avoid conflicts with actual IDs.
+                    finalMessagesMap[localMsg.clientTempId!] = localMsg;
+                  }
+                }
+              }
+
+              // 3. Convert map values back to a list and sort by timestamp ascending.
+              final List<Message> newMessagesList = finalMessagesMap.values.toList()
+                ..sort((a, b) => b.timestamp.compareTo(a.timestamp)); // Sort descending (newest first) for reversed list
+
+              // Determine if a new message was added to trigger scroll
+              // final bool shouldScrollToBottom = _messages.length < newMessagesList.length; // No longer needed
+
+              _messages = newMessagesList;
+
+              if (_messages.isNotEmpty) _showEncryptionBanner = false;
+
+              // Handle initial load scroll (no explicit scroll needed with reverse: true)
+              if (_isPageLoading) {
+                _isPageLoading = false;
+                // WidgetsBinding.instance.addPostFrameCallback((_) {
+                //   Future.delayed(const Duration(milliseconds: 250), () {
+                //     _scrollToBottom(animated: false); // Instant scroll on initial load
+                //   });
+                // });
+              }
+              // else if (shouldScrollToBottom) {
+              //   _scrollToBottom(animated: true);
+              // }
+            });
+          }),
+        );
+      }));
+    } catch (e) {
+      print('Error initializing chat: $e');
+      setState(() {
+        _isPageLoading = false;
+        _isChatReady = false;
+      });
+    }
   }
 
   void _onNewMessageChange(String value) {
@@ -165,48 +224,113 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  void _onSendMessage() {
+  void _onSendMessage() async {
     if (_newMessage.trim().isEmpty && _fileToSend == null) return;
+    if (_effectiveChatId == null || _authUser == null || _contact == null) return; // Ensure chat, user, and contact are ready
 
     final messageText = _newMessage.trim();
-    final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final tempId = 'local_$timestamp'; // Temporary ID for local tracking
 
-    final newMessageObject = Message(
-      id: messageId,
+    // 1️⃣ Create local message (optimistic UI)
+    final tempMessage = Message(
+      id: tempId,
+      clientTempId: tempId,
       chatId: _effectiveChatId!,
-      senderId: _authUser.id,
-      timestamp: DateTime.now().millisecondsSinceEpoch,
+      senderId: _authUser!.id,
+      timestamp: timestamp,
       type: MessageType.text,
-      readBy: [_authUser.id],
       text: messageText,
+      readBy: [_authUser!.id],
+      status: MessageStatus.sending,
     );
 
-    debugPrint('Sending message: ${newMessageObject.text}'); // Debug print
-
     setState(() {
-      _messages = List.from(_messages)..add(newMessageObject); // Create a new list instance
+      _messages.insert(0, tempMessage); // Insert at index 0 for reversed list
       _newMessage = '';
       _fileToSend = null;
       _filePreviewUrl = null;
+      _showEncryptionBanner = false;
     });
 
-    _messageController.clear(); // Explicitly clear the text field
+    _messageController.clear();
+    // _scrollToBottom(animated: true); // Removed as reverse: true handles this
 
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-    );
+    // 2️⃣ Encrypt and send in background
+    _encryptAndSend(tempMessage);
+  }
+
+  Future<void> _encryptAndSend(Message localMessage) async {
+    try {
+      final encryptedData = await _encryptionService.encryptMessage(
+        localMessage.text!,
+        [_contact!.id],
+        _authUser!.id,
+      );
+
+      // Upload encrypted message to Firestore
+      final docRef = await _firestore
+          .collection('chats')
+          .doc(_effectiveChatId)
+          .collection('messages')
+          .add({
+        'chatId': _effectiveChatId,
+        'senderId': _authUser!.id,
+        'timestamp': localMessage.timestamp,
+        'type': MessageType.text.toString(),
+        'readBy': [_authUser!.id],
+        'text': null,
+        'encryptedText': encryptedData['encryptedText'],
+        'keyId': encryptedData['keyId'],
+        'iv': encryptedData['iv'],
+        'encryptedKeys': encryptedData['encryptedKeys'],
+        'clientTempId': localMessage.clientTempId,
+        'status': MessageStatus.sent.toString(),
+      });
+
+      // Update chat lastMessage
+      await _firestore.collection('chats').doc(_effectiveChatId).update({
+        'lastMessage': {
+          'id': docRef.id,
+          'chatId': _effectiveChatId,
+          'senderId': _authUser!.id,
+          'timestamp': localMessage.timestamp,
+          'type': MessageType.text.toString(),
+          'readBy': [_authUser!.id],
+          'text': null,
+          'encryptedText': encryptedData['encryptedText'],
+          'keyId': encryptedData['keyId'],
+          'iv': encryptedData['iv'],
+          'encryptedKeys': encryptedData['encryptedKeys'],
+          'status': MessageStatus.sent.toString(),
+        },
+        'updatedAt': localMessage.timestamp,
+      });
+
+    } catch (e) {
+      print('Error sending message: $e');
+      // Mark local message as failed
+      if (mounted) {
+        setState(() {
+          final index =
+              _messages.indexWhere((msg) => msg.clientTempId == localMessage.clientTempId);
+          if (index != -1) {
+            _messages[index] = _messages[index].copyWith(status: MessageStatus.failed);
+          }
+        });
+      }
+    }
   }
 
   void _onToggleEmojiPicker() {
-    setState(() {
-      _isEmojiPickerOpen = !_isEmojiPickerOpen;
-    });
+    _emojiManager.toggleEmojiPicker(() => setState(() {}));
+    // Removed explicit _scrollToBottom call as reverse: true handles this
+    // Future.delayed(const Duration(milliseconds: 50), () {
+    //   _scrollToBottom(animated: true); // Scroll to bottom when emoji picker opens
+    // });
   }
 
   void _onFileSelect(dynamic file) {
-    // Placeholder for file selection logic
     setState(() {
       _fileToSend = file;
       _filePreviewUrl = 'https://via.placeholder.com/150'; // Mock preview URL
@@ -221,15 +345,25 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _handleEmojiSelect(String emoji) {
+    final text = _messageController.text;
+    final selection = _messageController.selection;
+    final newText = text.replaceRange(
+      selection.start,
+      selection.end,
+      emoji,
+    );
     setState(() {
-      _newMessage += emoji;
+      _newMessage = newText;
     });
+    _messageController.text = newText;
+    _messageController.selection = TextSelection.collapsed(offset: selection.start + emoji.length);
   }
 
   void _handleAcceptRequest() {
     setState(() {
       _chatDetails = _chatDetails?.copyWith(requestStatus: ChatRequestStatus.accepted);
     });
+    // TODO: Update Firestore chat request status to accepted
     print('Request accepted');
   }
 
@@ -237,6 +371,7 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       _chatDetails = _chatDetails?.copyWith(requestStatus: ChatRequestStatus.rejected);
     });
+    // TODO: Update Firestore chat request status to rejected
     print('Request rejected');
   }
 
@@ -244,6 +379,7 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       _chatDetails = _chatDetails?.copyWith(requestStatus: ChatRequestStatus.rejected);
     });
+    // TODO: Update Firestore chat request status to cancelled
     print('Request cancelled');
   }
 
@@ -327,7 +463,7 @@ class _ChatPageState extends State<ChatPage> {
     final showInputArea = _localKeysExist == true && isChatActive;
 
     final contactStatusText = _getDynamicStatus();
-    final headerContactName = _contact?.name ?? _chatDetails?.name ?? 'Chat';
+    final headerContactName = _contact?.displayName ?? _chatDetails?.name ?? 'Chat';
     final headerContactAvatar = _contact?.avatarUrl ?? _chatDetails?.avatarUrl;
 
     return Scaffold(
@@ -343,40 +479,47 @@ class _ChatPageState extends State<ChatPage> {
       ),
       body: Column(
         children: [
-          if (_localKeysExist == false && isChatActive) const EncryptedChatBanner(),
-          if (showRequestSpecificUI && _chatDetails != null && _contact != null && _authUser.id != null)
+          if ((_localKeysExist == false || _showEncryptionBanner) && _messages.isEmpty) const EncryptedChatBanner(),
+          if (showRequestSpecificUI && _chatDetails != null && _contact != null && _authUser!.id != null)
             ChatRequestDisplay(
               chatDetails: _chatDetails!,
-              contact: _contact!,
-              currentUserId: _authUser.id,
+              contact: toUser(_contact!), // Convert UserProfile to User
+              currentUserId: _authUser!.id,
               onAcceptRequest: _handleAcceptRequest,
               onRejectRequest: _handleRejectRequest,
               onCancelRequest: _handleCancelRequest,
               isProcessing: _isProcessingRequestAction,
             )
           else ...[
-            MessageArea(
-              messages: _messages,
-              currentUserId: _authUser.id,
-              contactId: _contact?.id,
-              dynamicPaddingBottom: _isEmojiPickerOpen ? EMOJI_PICKER_HEIGHT_PX : 0.0, // Simplified dynamic padding
-              isContactTyping: _isContactTyping,
-              scrollController: _scrollController,
+            Expanded(
+              child: MessageArea(
+                messages: _messages,
+                currentUserId: _authUser!.id,
+                contactId: _contact?.id,
+                // dynamicPaddingBottom: _isEmojiPickerOpen ? EMOJI_PICKER_HEIGHT_PX : 0.0, // Removed
+                isContactTyping: _isContactTyping,
+                scrollController: _scrollController,
+                padding: const EdgeInsets.only(top: 10.0),
+                encryptionService: _encryptionService,
+              ),
             ),
             if (showInputArea)
               ChatInputZone(
                 newMessage: _newMessage,
                 onNewMessageChange: _onNewMessageChange,
                 onSendMessage: _onSendMessage,
-                onToggleEmojiPicker: _onToggleEmojiPicker,
-                isEmojiPickerOpen: _isEmojiPickerOpen,
+                onToggleEmojiPicker: () {
+                  _emojiManager.toggleEmojiPicker(() => setState(() {}));
+                },
+                isEmojiPickerOpen: _emojiManager.isEmojiOpen,
                 onFileSelect: _onFileSelect,
-                textareaRef: _messageController, // Pass controller
+                textareaRef: _messageController,
+                focusNode: _messageFocusNode, // Pass the FocusNode
                 isDisabled: !_isChatReady || !isChatActive,
                 filePreviewUrl: _filePreviewUrl,
                 onClearFileSelection: _onClearFileSelection,
               ),
-            if (showInputArea && _isEmojiPickerOpen)
+            if (showInputArea && _emojiManager.isEmojiOpen) // Use _emojiManager.isEmojiOpen
               SizedBox(
                 height: EMOJI_PICKER_HEIGHT_PX,
                 child: EmojiPicker(onEmojiSelect: _handleEmojiSelect),

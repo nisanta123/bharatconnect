@@ -3,21 +3,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class UserProfile {
   final String id;
   final String email;
-  String? username;
-  String? displayName;
-  String? avatarUrl;
-  bool onboardingComplete;
-  String? phone;
-  String? bio;
-  String? activeKeyId; // For E2EE, if implemented later
-  String? activeAuraId; // New field to store the ID of the active aura
+  final String displayName; // 👈 standardized instead of "name"
+  final String? username;
+  final String? avatarUrl;
+  final String? status; // Add status field
+  final bool onboardingComplete;
+  final String? phone;
+  final String? bio;
+  final String? activeKeyId; // For E2EE, if implemented later
+  final String? activeAuraId; // New field to store the ID of the active aura
 
   UserProfile({
     required this.id,
     required this.email,
+    required this.displayName,
     this.username,
-    this.displayName,
     this.avatarUrl,
+    this.status, // Include in constructor
     this.onboardingComplete = false,
     this.phone,
     this.bio,
@@ -25,35 +27,41 @@ class UserProfile {
     this.activeAuraId, // Include in constructor
   });
 
-  // Factory constructor to create a UserProfile from a Firestore document
+  // Factory to create from Firestore or Map
   factory UserProfile.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    return UserProfile.fromMap(doc.id, data);
+  }
+
+  factory UserProfile.fromMap(String id, Map<String, dynamic> data) {
     return UserProfile(
-      id: doc.id,
-      email: data['email'] as String,
+      id: id,
+      email: data['email'] as String? ?? '',
+      displayName: data['displayName'] as String? ?? data['username'] as String? ?? '', // 👈 fallback so it's never null
       username: data['username'] as String?,
-      displayName: data['displayName'] as String?,
       avatarUrl: data['avatarUrl'] as String?,
+      status: data['status'] as String?,
       onboardingComplete: data['onboardingComplete'] as bool? ?? false,
-      phone: data['phone'] as String?,
       bio: data['bio'] as String?,
+      phone: data['phone'] as String?,
       activeKeyId: data['activeKeyId'] as String?,
       activeAuraId: data['activeAuraId'] as String?, // Include in fromFirestore
     );
   }
 
-  // Method to convert UserProfile to a map for Firestore
-  Map<String, dynamic> toFirestore() {
+  // Convert to Map for saving
+  Map<String, dynamic> toMap() {
     return {
       'email': email,
-      'username': username,
       'displayName': displayName,
+      'username': username,
       'avatarUrl': avatarUrl,
+      'status': status, // Include in toMap
       'onboardingComplete': onboardingComplete,
       'phone': phone,
       'bio': bio,
       'activeKeyId': activeKeyId,
-      'activeAuraId': activeAuraId, // Include in toFirestore
+      'activeAuraId': activeAuraId, // Include in toMap
     };
   }
 
@@ -62,6 +70,7 @@ class UserProfile {
     String? username,
     String? displayName,
     String? avatarUrl,
+    String? status,
     bool? onboardingComplete,
     String? phone,
     String? bio,
@@ -74,6 +83,7 @@ class UserProfile {
       username: username ?? this.username,
       displayName: displayName ?? this.displayName,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      status: status ?? this.status,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
       phone: phone ?? this.phone,
       bio: bio ?? this.bio,

@@ -79,10 +79,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         _currentUserProfile = UserProfile(
           id: user.uid,
           email: user.email ?? '',
+          displayName: user.displayName ?? user.email?.split('@')[0] ?? '', // Add displayName
+          username: user.email?.split('@')[0], // username is nullable
           onboardingComplete: false,
+          // status will be null initially
         );
-        _displayNameController.text = user.displayName ?? user.email?.split('@')[0] ?? '';
-        _usernameController.text = user.email?.split('@')[0] ?? '';
+        _displayNameController.text = _currentUserProfile!.displayName;
+        _usernameController.text = _currentUserProfile!.username ?? '';
       }
     } on FirebaseException catch (e) {
       print('ProfileSetupScreen: FirebaseException in _fetchUserProfile: ${e.code} - ${e.message}');
@@ -224,6 +227,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       "bio": trimmedBio.isNotEmpty ? trimmedBio : null,
       "onboardingComplete": true,
       "createdAt": FieldValue.serverTimestamp(),
+      "status": null, // Add status field, initially null
     };
 
     try {
