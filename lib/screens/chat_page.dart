@@ -11,6 +11,8 @@ import 'package:bharatconnect/services/user_service.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb_auth;
 import 'package:bharatconnect/models/user_profile_model.dart';
 import 'package:bharatconnect/services/encryption_service.dart';
+import 'package:bharatconnect/services/aura_service.dart'; // Import AuraService
+import 'package:bharatconnect/models/aura_models.dart'; // Import UserAura from aura_models.dart
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bharatconnect/widgets/chat/emoji_manager.dart'; // Import EmojiManager
@@ -35,6 +37,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver { // Ad
   final UserService _userService = UserService(); // Initialize UserService
   final EncryptionService _encryptionService = EncryptionService(); // Instantiate EncryptionService
   final FirebaseFirestore _firestore = FirebaseFirestore.instance; // Initialize Firestore
+  final AuraService _auraService = AuraService(); // Instantiate AuraService
 
   User? _authUser; // Will be set from currentUserProfile
   bool _isAuthenticated = false;
@@ -152,6 +155,21 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver { // Ad
           _isChatReady = true;
           _isPageLoading = false;
         });
+
+        // Stream contact's active aura
+        _requestSubscriptions.add(
+          _auraService.getConnectedUsersAuras([otherParticipantId]).listen((auras) {
+            if (auras.isNotEmpty) {
+              setState(() {
+                _contactActiveAura = auras.first.auraStyle; // Assuming DisplayAura has an auraStyle property
+              });
+            } else {
+              setState(() {
+                _contactActiveAura = null;
+              });
+            }
+          }),
+        );
 
         // Stream messages for the chat
         _requestSubscriptions.add(
@@ -473,6 +491,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver { // Ad
         contactAvatarUrl: headerContactAvatar,
         contactStatusText: contactStatusText,
         isChatActive: isChatActive,
+        contactActiveAura: _contactActiveAura, // Pass the contact's active aura
         onMoreOptionsClick: () {
           print('More options clicked');
         },

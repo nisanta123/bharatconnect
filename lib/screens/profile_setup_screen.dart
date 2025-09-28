@@ -238,9 +238,10 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
 
       showCustomToast(context, 'Welcome, $finalDisplayName! Your BharatConnect account is ready.');
 
-      // Navigate to home screen
-      Navigator.of(context).pushReplacement(
+      // Navigate to home screen and remove all previous routes from the stack
+      Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => HomeScreen()),
+        (route) => false, // This predicate removes all previous routes
       );
     } on FirebaseException catch (error) {
       _errorMessage = 'Failed to save your profile or generate keys. Please try again.';

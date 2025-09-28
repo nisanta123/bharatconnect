@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:bharatconnect/models/aura_models.dart'; // Import UserAura from aura_models.dart
+import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
 
 class ChatPageHeader extends StatelessWidget implements PreferredSizeWidget {
   final String contactName;
   final String? contactId;
   final String? contactAvatarUrl;
   final String contactStatusText;
+  final UserAura? contactActiveAura; // Add UserAura parameter
   final String? contactAuraIconUrl;
   final String? contactAuraName;
   final bool isChatActive;
@@ -16,6 +19,7 @@ class ChatPageHeader extends StatelessWidget implements PreferredSizeWidget {
     this.contactId,
     this.contactAvatarUrl,
     required this.contactStatusText,
+    this.contactActiveAura, // Initialize UserAura parameter
     this.contactAuraIconUrl,
     this.contactAuraName,
     required this.isChatActive,
@@ -40,22 +44,52 @@ class ChatPageHeader extends StatelessWidget implements PreferredSizeWidget {
         },
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 18, // Slightly reduced radius for smaller profile picture
-              backgroundImage: contactAvatarUrl != null && contactAvatarUrl!.isNotEmpty
-                  ? NetworkImage(contactAvatarUrl!)
-                  : null,
-              child: contactAvatarUrl == null || contactAvatarUrl!.isEmpty
-                  ? const Icon(Icons.person, size: 22) // Adjusted icon size
-                  : null,
+            // Replaced CircleAvatar with DefaultAvatar and added aura ring logic
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                if (contactActiveAura != null)
+                  Container(
+                    width: 40, // Slightly larger than avatar for the ring
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        colors: [
+                          contactActiveAura!.primaryColor,
+                          contactActiveAura!.secondaryColor,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                  ),
+                DefaultAvatar(
+                  radius: 18, // Slightly reduced radius for smaller profile picture
+                  avatarUrl: contactAvatarUrl,
+                  name: contactName, // Pass contactName for default avatar
+                ),
+              ],
             ),
             const SizedBox(width: 6), // Reduced width for smaller gap
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  contactName,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                Row(
+                  children: [
+                    Text(
+                      contactName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    if (contactActiveAura != null) ...[
+                      const SizedBox(width: 4), // Small space between name and aura
+                      Image.asset(
+                        contactActiveAura!.iconUrl, // Corrected from iconPath to iconUrl
+                        height: 18, // Adjust size as needed
+                        width: 18,
+                      ),
+                    ],
+                  ],
                 ),
                 Text(
                   contactStatusText,

@@ -11,7 +11,7 @@ class EncryptedChatBanner extends StatelessWidget {
         child: Chip(
           backgroundColor: Theme.of(context).colorScheme.secondary.withOpacity(0.2),
           labelPadding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 0.0), // Smaller horizontal padding
-          side: BorderSide(color: Theme.of(context).colorScheme.secondary.withOpacity(0.4), width: 0.5), // Smaller border
+          side: BorderSide(color: Colors.grey.withOpacity(0.4), width: 0.5), // Changed border color to grey
           label: Row(
             mainAxisSize: MainAxisSize.min, // Ensure row takes minimum space
             children: <Widget>[

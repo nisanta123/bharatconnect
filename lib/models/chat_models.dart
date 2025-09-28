@@ -374,22 +374,6 @@ class Chat {
   }
 }
 
-class UserAura {
-  final String id;
-  final String name;
-  final String iconUrl;
-  final Color primaryColor;
-  final Color secondaryColor;
-
-  const UserAura({
-    required this.id,
-    required this.name,
-    required this.iconUrl,
-    required this.primaryColor,
-    required this.secondaryColor,
-  });
-}
-
 class FirestoreAura {
   final String userId;
   final String auraOptionId;

@@ -167,13 +167,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
           )
         : null;
 
+    // Extract connected user IDs from active chats
+    final List<String> connectedUserIds = _chats
+        .expand((chat) => chat.participants)
+        .where((id) => id != widget.currentUserProfile?.id)
+        .toSet() // Use toSet to get unique IDs
+        .toList();
+
     return CustomScrollView( // Removed ScrollConfiguration wrapper
       slivers: [
         if (currentUserForAuraBar != null) // Conditionally show AuraBar
           SliverToBoxAdapter(
             child: AuraBar(
               currentUser: currentUserForAuraBar,
-              connectedUserIds: [], // AuraBar will fetch connected users internally
+              connectedUserIds: connectedUserIds, // Pass the extracted connected user IDs
             ),
           ),
         // Display Received Requests
