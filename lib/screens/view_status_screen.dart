@@ -31,6 +31,7 @@ class _ViewStatusScreenState extends State<ViewStatusScreen> with SingleTickerPr
   UserProfile? _currentUserProfile; // To store the current user's profile
   bool _isLoading = true;
   String? _errorMessage;
+  bool _isHolding = false; // Flag to track long-press state
 
   late AnimationController _progressController;
   int _currentIndex = 0;
@@ -193,7 +194,8 @@ class _ViewStatusScreenState extends State<ViewStatusScreen> with SingleTickerPr
       backgroundColor: backgroundColor,
       body: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTapDown: (details) {
+        onTapUp: (details) {
+          if (_isHolding) return; // ignore taps if holding
           final w = MediaQuery.of(context).size.width;
           if (details.globalPosition.dx < w / 2) {
             _handlePrevious();
@@ -202,10 +204,20 @@ class _ViewStatusScreenState extends State<ViewStatusScreen> with SingleTickerPr
           }
         },
         onLongPressStart: (_) {
+          _isHolding = true;
           _progressController.stop();
         },
         onLongPressEnd: (_) {
+          _isHolding = false;
           _progressController.forward();
+        },
+        onVerticalDragUpdate: (details) {
+          // If viewing own status, allow swipe up to see viewers
+          if (_currentUserProfile != null &&
+              widget.userId == _currentUserProfile!.id &&
+              details.primaryDelta! < -10) { // A negative delta indicates a swipe up
+            _showViewers(context, currentStatus.id);
+          }
         },
         child: Stack(
           children: [
@@ -274,36 +286,27 @@ class _ViewStatusScreenState extends State<ViewStatusScreen> with SingleTickerPr
                 bottom: 0,
                 left: 0,
                 right: 0,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque, // Ensure it captures gestures in its area
-                  onVerticalDragUpdate: (details) {
-                    if (details.primaryDelta! < -10) { // Swipe up
-                      _showViewers(context, currentStatus.id);
-                    }
-                  },
-                  child: Container(
-                    color: Colors.transparent, // Allows gesture to be detected over a larger area
-                    padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.remove_red_eye, color: Colors.white),
-                        const SizedBox(height: 4),
-                        StreamBuilder<QuerySnapshot>(
-                          stream: _statusService.getStatusViews(currentStatus.id),
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) {
-                              return const Text('0', style: TextStyle(color: Colors.white));
-                            }
-                            final viewCount = snapshot.data!.docs.length;
-                            return Text(
-                              '$viewCount',
-                              style: const TextStyle(color: Colors.white, fontSize: 16),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.remove_red_eye, color: Colors.white),
+                      const SizedBox(height: 4),
+                      StreamBuilder<QuerySnapshot>(
+                        stream: _statusService.getStatusViews(currentStatus.id),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return const Text('0', style: TextStyle(color: Colors.white));
+                          }
+                          final viewCount = snapshot.data!.docs.length;
+                          return Text(
+                            '$viewCount',
+                            style: const TextStyle(color: Colors.white, fontSize: 16),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
