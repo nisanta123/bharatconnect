@@ -101,9 +101,9 @@ class _AccountScreenState extends State<AccountScreen> {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 16.0),
         children: [
-          ProfileCard(initialProfileData: _userProfile!, authUid: _userProfile!.id), // Pass actual user profile
+          ProfileCard(initialProfileData: _userProfile!, authUid: _userProfile!.id, onProfileUpdated: _fetchUserProfile), // Pass actual user profile
           const SizedBox(height: 16),
-          const ConnectionsCard(),
+          ConnectionsCard(currentUserId: _userProfile!.id),
           const SizedBox(height: 16),
           const ChatBackupCard(),
           const SizedBox(height: 16),

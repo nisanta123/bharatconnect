@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bharatconnect/services/status_service.dart';
 import 'package:bharatconnect/models/status_model.dart';
 import 'package:bharatconnect/models/user_profile_model.dart'; // Import UserProfile
 import 'package:bharatconnect/widgets/default_avatar.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ViewStatusScreen extends StatefulWidget {
   final String userId;
@@ -19,54 +23,129 @@ class ViewStatusScreen extends StatefulWidget {
   State<ViewStatusScreen> createState() => _ViewStatusScreenState();
 }
 
-class _ViewStatusScreenState extends State<ViewStatusScreen> {
+class _ViewStatusScreenState extends State<ViewStatusScreen> with SingleTickerProviderStateMixin {
   final StatusService _statusService = StatusService();
-  DisplayStatus? _status;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  List<Status> _statuses = [];
+  UserProfile? _ownerProfile;
+  UserProfile? _currentUserProfile; // To store the current user's profile
   bool _isLoading = true;
   String? _errorMessage;
+
+  late AnimationController _progressController;
+  int _currentIndex = 0;
+  // duration per status (seconds) — short for demo; can be tied to content length
+  static const int _perStatusSeconds = 6;
 
   @override
   void initState() {
     super.initState();
-    _fetchStatus();
+    _progressController = AnimationController(vsync: this, duration: const Duration(seconds: _perStatusSeconds))
+      ..addStatusListener((AnimationStatus status) {
+        if (status == AnimationStatus.completed) {
+          _handleNext();
+        }
+      })
+      ..addListener(() {
+        if (mounted) setState(() {});
+      });
+    _fetchInitialData();
   }
 
-  Future<void> _fetchStatus() async {
+  @override
+  void dispose() {
+    _progressController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchInitialData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      // This is a simplified fetch. In a real app, you might fetch a stream
-      // of statuses for a user and manage progress.
-      final statusDoc = await _statusService.statusesCollection.doc(widget.statusId).get();
-      if (!statusDoc.exists) {
-        throw Exception('Status not found.');
+      // Fetch current user's profile
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        final currentUserDoc = await _statusService.userProfilesCollection.doc(currentUser.uid).get();
+        if (currentUserDoc.exists) {
+          _currentUserProfile = UserProfile.fromFirestore(currentUserDoc);
+        } else {
+          // Fallback to create a profile from the auth user if the document doesn't exist
+          _currentUserProfile = UserProfile(
+            id: currentUser.uid,
+            email: currentUser.email ?? '',
+            displayName: currentUser.displayName ?? '',
+            username: null, // Not available from auth user object
+            avatarUrl: currentUser.photoURL,
+          );
+        }
       }
-      final status = Status.fromFirestore(statusDoc);
 
+      // Fetch owner profile
       final userProfileDoc = await _statusService.userProfilesCollection.doc(widget.userId).get();
-      if (!userProfileDoc.exists) {
-        throw Exception('User profile not found for status owner.');
+      if (userProfileDoc.exists) {
+        _ownerProfile = UserProfile.fromFirestore(userProfileDoc);
       }
-      final userProfile = UserProfile.fromFirestore(userProfileDoc);
 
-      setState(() {
-        _status = DisplayStatus.fromStatusAndUserProfile(
-          status: status,
-          userProfile: userProfile,
-          viewedByCurrentUser: true, // Assume viewed when opened
-        );
-      });
+      // Fetch all statuses for this user ordered by createdAt ascending so index 0 is first
+      final snapshot = await _status_service_query(widget.userId);
+      final docs = snapshot.docs;
+      _statuses = docs.map((d) => Status.fromFirestore(d)).toList();
+
+      // Find initial index from provided statusId
+      final startIndex = _statuses.indexWhere((s) => s.id == widget.statusId);
+      _currentIndex = startIndex >= 0 ? startIndex : 0;
+
+      // Start progress animation
+      _startProgress();
+
+      setState(() {});
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to load status: $e';
+        _errorMessage = 'Failed to load statuses: $e';
       });
     } finally {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _status_service_query(String userId) async {
+    // Avoid range queries on multiple fields (expiresAt + createdAt) which require composite indexes.
+    // Instead fetch statuses for the user ordered by createdAt and filter expired ones client-side.
+    return await _statusService.statusesCollection.where('userId', isEqualTo: userId).orderBy('createdAt').get();
+  }
+
+  void _startProgress() {
+    _progressController.reset();
+    _progressController.forward();
+
+    // Record the view, including the owner's
+    if (_currentUserProfile != null) {
+      final currentStatus = _statuses[_currentIndex];
+      _statusService.recordStatusView(currentStatus.id, _currentUserProfile!);
+    }
+  }
+
+  void _handleNext() {
+    if (_currentIndex < _statuses.length - 1) {
+      setState(() => _currentIndex += 1);
+      _startProgress();
+    } else {
+      // At end: pop to previous screen
+      Navigator.of(context).pop();
+    }
+  }
+
+  void _handlePrevious() {
+    if (_currentIndex > 0) {
+      setState(() => _currentIndex -= 1);
+      _startProgress();
+    } else {
+      Navigator.of(context).pop();
     }
   }
 
@@ -85,78 +164,236 @@ class _ViewStatusScreenState extends State<ViewStatusScreen> {
       );
     }
 
-    if (_status == null) {
+    if (_statuses.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Status Not Found')),
-        body: const Center(child: Text('Status data could not be loaded.')),
+        appBar: AppBar(title: const Text('Status')),
+        body: const Center(child: Text('No statuses available.')),
       );
     }
 
+    final currentStatus = _statuses[_currentIndex];
+    final owner = _ownerProfile ?? UserProfile(id: currentStatus.userId, email: '', displayName: '');
+    final displayStatus = DisplayStatus.fromStatusAndUserProfile(status: currentStatus, userProfile: owner, viewedByCurrentUser: true);
+
     // Parse background color from string to Color
     Color backgroundColor = Colors.black; // Default if not specified or invalid
-    if (_status!.backgroundColor != null) {
+    if (displayStatus.backgroundColor != null) {
       try {
-        backgroundColor = Color(int.parse(_status!.backgroundColor!, radix: 16));
+        final raw = displayStatus.backgroundColor!;
+        // allow both hex strings with or without leading 0x/#
+        var hex = raw.replaceAll('#', '').replaceAll('0x', '');
+        if (hex.length == 6) hex = 'FF$hex'; // add alpha if missing
+        backgroundColor = Color(int.parse(hex, radix: 16));
       } catch (e) {
-        print('Error parsing background color: $e');
+        // ignore and use default
       }
     }
 
     return Scaffold(
       backgroundColor: backgroundColor,
-      body: Stack(
-        children: [
-          // Status content
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                _status!.text,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.getFont(
-                  _status!.fontFamily ?? 'Roboto', // Use selected font or default
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (details) {
+          final w = MediaQuery.of(context).size.width;
+          if (details.globalPosition.dx < w / 2) {
+            _handlePrevious();
+          } else {
+            _handleNext();
+          }
+        },
+        onLongPressStart: (_) {
+          _progressController.stop();
+        },
+        onLongPressEnd: (_) {
+          _progressController.forward();
+        },
+        child: Stack(
+          children: [
+            // Content
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  displayStatus.text,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.getFont(
+                    displayStatus.fontFamily ?? 'Roboto',
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
-          ),
-          // Top bar with user info and progress (simplified for single status)
-          Positioned( // Positioned at the top
-            top: 0,
-            left: 0,
-            right: 0,
-            child: AppBar(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-              title: Row(
+
+            // Top: segmented progress bars + user info
+            SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  DefaultAvatar(
-                    radius: 18,
-                    avatarUrl: _status!.userAvatarUrl,
-                    name: _status!.userName,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                    child: Row(
+                      children: _buildProgressSegments(),
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _status!.userName,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${_status!.createdAt.hour}:${_status!.createdAt.minute}', // Display time
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  // user row
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, color: Colors.white),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        DefaultAvatar(radius: 18, avatarUrl: displayStatus.userAvatarUrl, name: displayStatus.userName),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(displayStatus.userName, style: const TextStyle(color: Colors.white, fontSize: 16)),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${displayStatus.createdAt.hour.toString().padLeft(2, '0')}:${displayStatus.createdAt.minute.toString().padLeft(2, '0')}',
+                                style: const TextStyle(color: Colors.white70, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-        ],
+
+            // Bottom: View count for own status
+            if (_currentUserProfile != null && widget.userId == _currentUserProfile!.id)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque, // Ensure it captures gestures in its area
+                  onVerticalDragUpdate: (details) {
+                    if (details.primaryDelta! < -10) { // Swipe up
+                      _showViewers(context, currentStatus.id);
+                    }
+                  },
+                  child: Container(
+                    color: Colors.transparent, // Allows gesture to be detected over a larger area
+                    padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 20.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.remove_red_eye, color: Colors.white),
+                        const SizedBox(height: 4),
+                        StreamBuilder<QuerySnapshot>(
+                          stream: _statusService.getStatusViews(currentStatus.id),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return const Text('0', style: TextStyle(color: Colors.white));
+                            }
+                            final viewCount = snapshot.data!.docs.length;
+                            return Text(
+                              '$viewCount',
+                              style: const TextStyle(color: Colors.white, fontSize: 16),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  void _showViewers(BuildContext context, String statusId) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Viewed by', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Expanded(
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _statusService.getStatusViews(statusId),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(child: Text('No views yet.'));
+                    }
+
+                    final viewers = snapshot.data!.docs;
+
+                    return ListView.builder(
+                      itemCount: viewers.length,
+                      itemBuilder: (context, index) {
+                        final viewerData = viewers[index].data() as Map<String, dynamic>;
+                        final isCurrentUser = viewerData['viewerId'] == _currentUserProfile?.id;
+
+                        return ListTile(
+                          leading: DefaultAvatar(
+                            radius: 20,
+                            avatarUrl: viewerData['viewerAvatarUrl'],
+                            name: viewerData['viewerName'],
+                          ),
+                          title: Text(isCurrentUser ? 'You' : viewerData['viewerName'] ?? 'Unknown'),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  List<Widget> _buildProgressSegments() {
+    final total = _statuses.length;
+    return List.generate(total, (i) {
+      double fill = 0.0;
+      if (i < _currentIndex) {
+        fill = 1.0;
+      } else if (i == _currentIndex) {
+        fill = _progressController.value;
+      } else {
+        fill = 0.0;
+      }
+
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2.0),
+          child: SizedBox(
+            height: 3,
+            child: Stack(
+              children: [
+                Container(decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+                FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: fill.clamp(0.0, 1.0),
+                  child: Container(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(2))),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
   }
 }

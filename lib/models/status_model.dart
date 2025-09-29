@@ -76,6 +76,23 @@ class DisplayStatus {
     this.viewedByCurrentUser = false,
   });
 
+  DisplayStatus copyWith({
+    bool? viewedByCurrentUser,
+  }) {
+    return DisplayStatus(
+      id: id,
+      userId: userId,
+      userName: userName,
+      userAvatarUrl: userAvatarUrl,
+      text: text,
+      fontFamily: fontFamily,
+      backgroundColor: backgroundColor,
+      createdAt: createdAt,
+      expiresAt: expiresAt,
+      viewedByCurrentUser: viewedByCurrentUser ?? this.viewedByCurrentUser,
+    );
+  }
+
   // Helper to create a DisplayStatus from a Status and UserProfile
   factory DisplayStatus.fromStatusAndUserProfile({
     required Status status,

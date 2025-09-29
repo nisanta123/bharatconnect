@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 import 'package:bharatconnect/models/user_profile_model.dart'; // Import UserProfile
 import '../models/aura_models.dart';
 import '../models/search_models.dart'; // Import for UserRequestStatus
@@ -148,30 +150,14 @@ class UserService {
     final firestore = FirebaseFirestore.instance;
 
     // If the target is self
-    if (currentUserId == targetUserId) return UserRequestStatus.is_self;
+    if (currentUserId == targetUserId) {
+      print('DEBUG: getChatStatus - Target is self.');
+      return UserRequestStatus.is_self;
+    }
 
     try {
-      // 1️⃣ Check if current user has sent a request
-      final sentSnapshot = await firestore
-          .collection('bharatConnectUsers')
-          .doc(currentUserId)
-          .collection('requestsSent')
-          .doc(targetUserId)
-          .get();
-
-      if (sentSnapshot.exists) return UserRequestStatus.request_sent;
-
-      // 2️⃣ Check if current user has received a request
-      final receivedSnapshot = await firestore
-          .collection('bharatConnectUsers')
-          .doc(currentUserId)
-          .collection('requestsReceived')
-          .doc(targetUserId)
-          .get();
-
-      if (receivedSnapshot.exists) return UserRequestStatus.request_received;
-
-      // 3️⃣ Check if a chat already exists between the two users
+      // 1️⃣ Check if a chat already exists between the two users (PRIORITY 1)
+      print('DEBUG: getChatStatus - Checking for existing chat...');
       final chatQuery = await firestore
           .collection('chats')
           .where('participants', arrayContains: currentUserId)
@@ -179,12 +165,48 @@ class UserService {
 
       final chatExists = chatQuery.docs.any((doc) {
         final participants = List<String>.from(doc['participants']);
-        return participants.contains(targetUserId);
+        final exists = participants.contains(targetUserId);
+        if (exists) {
+          print('DEBUG: getChatStatus - Chat exists with ID: ${doc.id}');
+        }
+        return exists;
       });
 
       if (chatExists) return UserRequestStatus.chat_exists;
+      print('DEBUG: getChatStatus - No existing chat found.');
+
+      // 2️⃣ Check if current user has sent a request (PRIORITY 2)
+      print('DEBUG: getChatStatus - Checking for sent request...');
+      final sentSnapshot = await firestore
+          .collection('bharatConnectUsers')
+          .doc(currentUserId)
+          .collection('requestsSent')
+          .doc(targetUserId)
+          .get();
+
+      if (sentSnapshot.exists) {
+        print('DEBUG: getChatStatus - Request sent.');
+        return UserRequestStatus.request_sent;
+      }
+      print('DEBUG: getChatStatus - No sent request found.');
+
+      // 3️⃣ Check if current user has received a request (PRIORITY 3)
+      print('DEBUG: getChatStatus - Checking for received request...');
+      final receivedSnapshot = await firestore
+          .collection('bharatConnectUsers')
+          .doc(currentUserId)
+          .collection('requestsReceived')
+          .doc(targetUserId)
+          .get();
+
+      if (receivedSnapshot.exists) {
+        print('DEBUG: getChatStatus - Request received.');
+        return UserRequestStatus.request_received;
+      }
+      print('DEBUG: getChatStatus - No received request found.');
 
       // 4️⃣ If none of the above, user is idle
+      print('DEBUG: getChatStatus - User is idle.');
       return UserRequestStatus.idle;
 
     } catch (e) {
@@ -225,6 +247,94 @@ class UserService {
       }
     } catch (e) {
       print('Error fetching user by ID: $e');
+      return null;
+    }
+  }
+
+  /// Update user profile fields in Firestore and local store.
+  Future<bool> updateUserProfile(String userId, Map<String, dynamic> updates) async {
+    try {
+      await _firestore.collection('bharatConnectUsers').doc(userId).update(updates);
+      // If we have the user in the local store, update it as well
+      final current = await getUserById(userId);
+      if (current != null) {
+        final updated = UserProfile(
+          id: current.id,
+          email: updates['email'] ?? current.email,
+          displayName: updates['displayName'] ?? current.displayName,
+          username: updates['username'] ?? current.username,
+          avatarUrl: updates['avatarUrl'] ?? current.avatarUrl,
+          activeAuraId: updates['activeAuraId'] ?? current.activeAuraId,
+          onboardingComplete: current.onboardingComplete,
+          bio: updates['bio'] ?? current.bio,
+          phone: updates['phone'] ?? current.phone,
+          activeKeyId: current.activeKeyId,
+        );
+        await _localDataStore.saveUser(updated);
+      }
+      return true;
+    } catch (e) {
+      print('Error updating user profile: $e');
+      return false;
+    }
+  }
+
+  /// Uploads [file] to Firebase Storage under a user-specific path and
+  /// updates the user's profile `avatarUrl` with the download URL.
+  /// Uploads [file] to Firebase Storage and returns the download URL.
+  ///
+  /// If [onProgress] is provided it will be called with a value between 0.0
+  /// and 1.0 representing upload progress.
+  Future<String?> uploadUserAvatar(String userId, File file, {void Function(double)? onProgress}) async {
+    try {
+      final storage = FirebaseStorage.instance;
+      final ref = storage.ref().child('user_avatars').child(userId).child('${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final uploadTask = ref.putFile(file);
+
+      // Listen for progress events if callback provided
+      if (onProgress != null) {
+        uploadTask.snapshotEvents.listen((snapshot) {
+          final total = snapshot.totalBytes > 0 ? snapshot.totalBytes : 1;
+          final transferred = snapshot.bytesTransferred;
+          final progress = transferred / total;
+          try {
+            onProgress(progress.clamp(0.0, 1.0));
+          } catch (_) {}
+        }, onError: (e) {
+          print('Upload snapshot error: $e');
+        });
+      }
+
+      final snapshot = await uploadTask;
+      if (snapshot.state == TaskState.success) {
+        final downloadUrl = await ref.getDownloadURL();
+
+        // Update Firestore with the new avatar URL
+        await _firestore.collection('bharatConnectUsers').doc(userId).update({'avatarUrl': downloadUrl});
+
+        // Update local cache if present
+        final current = await getUserById(userId);
+        if (current != null) {
+          final updated = UserProfile(
+            id: current.id,
+            email: current.email,
+            displayName: current.displayName,
+            username: current.username,
+            avatarUrl: downloadUrl,
+            activeAuraId: current.activeAuraId,
+            onboardingComplete: current.onboardingComplete,
+            bio: current.bio,
+            phone: current.phone,
+            activeKeyId: current.activeKeyId,
+          );
+          await _localDataStore.saveUser(updated);
+        }
+
+        return downloadUrl;
+      }
+      return null;
+    } catch (e) {
+      print('Error uploading avatar: $e');
       return null;
     }
   }
@@ -330,6 +440,26 @@ class UserService {
     });
 
     return controller.stream;
+  }
+
+  Future<String?> getExistingChatId(String userId1, String userId2) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('chats')
+          .where('participants', arrayContains: userId1)
+          .get();
+
+      for (var doc in querySnapshot.docs) {
+        final participants = List<String>.from(doc['participants']);
+        if (participants.contains(userId2)) {
+          return doc.id;
+        }
+      }
+      return null; // No existing chat found
+    } catch (e) {
+      print('Error getting existing chat ID: $e');
+      return null;
+    }
   }
 
   Future<void> cancelChatRequest(ChatRequest request) async {

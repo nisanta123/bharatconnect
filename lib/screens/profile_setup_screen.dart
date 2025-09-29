@@ -13,7 +13,8 @@ import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAva
 
 class ProfileSetupScreen extends StatefulWidget {
   final User user;
-  const ProfileSetupScreen({super.key, required this.user});
+  final String? initialPhotoPath;
+  const ProfileSetupScreen({super.key, required this.user, this.initialPhotoPath});
 
   @override
   State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
@@ -41,6 +42,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     super.initState();
     print('ProfileSetupScreen: initState called.');
     _fetchUserProfile();
+    // If an initial photo path was provided (from signup), set it as preview
+    if (widget.initialPhotoPath != null) {
+      _profilePicFile = File(widget.initialPhotoPath!);
+      _profilePicPreviewUrl = widget.initialPhotoPath;
+    }
   }
 
   @override

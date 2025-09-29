@@ -4,7 +4,9 @@ import 'package:bharatconnect/models/search_models.dart';
 import 'package:bharatconnect/services/user_service.dart';
 import 'package:bharatconnect/models/aura_models.dart';
 import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
+import 'package:bharatconnect/widgets/custom_toast.dart';
 import 'package:bharatconnect/screens/user_profile_screen.dart'; // Import UserProfileScreen
+import 'package:bharatconnect/screens/chat_page.dart'; // Import ChatPage
 
 class SearchScreen extends StatefulWidget {
   final String currentUserId;
@@ -95,13 +97,9 @@ class _SearchScreenState extends State<SearchScreen> {
       await _userService.sendChatRequest(widget.currentUserId, targetUserId);
       // After sending, refresh the search results to update the button status
       await _performSearch(_searchController.text);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chat request sent!')),
-      );
+      showCustomToast(context, 'Chat request sent!');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send request: $e')),
-      );
+      showCustomToast(context, 'Failed to send request: $e', isError: true);
     }
   }
 
@@ -160,15 +158,26 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       case UserRequestStatus.chat_exists:
         return OutlinedButton(
-          onPressed: () {
-            // Handle open chat - navigate to chat page
-            print('Open chat with ${user.name}');
+          onPressed: () async {
+            // Fetch the existing chatId and navigate to ChatPage
+            try {
+              final chatId = await _userService.getExistingChatId(widget.currentUserId, user.id);
+              if (chatId != null) {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (context) => ChatPage(chatId: chatId, currentUserProfile: null), // Pass currentUserProfile if available
+                ));
+              } else {
+                showCustomToast(context, 'Chat not found.', isError: true);
+              }
+              } catch (e) {
+                showCustomToast(context, 'Error opening chat: $e', isError: true);
+              }
           },
           style: OutlinedButton.styleFrom(
-            side: BorderSide(color: Theme.of(context).colorScheme.primary),
+            side: BorderSide(color: Theme.of(context).colorScheme.primary), // Use primary color for border
             foregroundColor: Theme.of(context).colorScheme.primary,
           ),
-          child: const Text('Open Chat'),
+          child: const Text('Connected'), // Changed to 'Connected'
         );
       case UserRequestStatus.idle:
       default:

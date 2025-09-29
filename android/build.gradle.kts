@@ -22,3 +22,14 @@ subprojects {
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }
+
+// Configure Java compilation to show deprecation warnings so you can find and fix deprecated API usage.
+subprojects {
+    // Only enable strict Java linting for the main app module to avoid surfacing
+    // deprecation warnings originating from plugin code in the pub cache.
+    if (project.name == "app") {
+        tasks.withType<JavaCompile>().configureEach {
+            options.compilerArgs.addAll(listOf("-Xlint:deprecation", "-Xlint:unchecked"))
+        }
+    }
+}

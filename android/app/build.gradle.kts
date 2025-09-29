@@ -20,6 +20,8 @@ android {
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString() // Updated to Java 17
+        // Keep Kotlin compiler args editable; add common safe flags. Note: -Xlint is a javac flag; we add it for Java separately.
+        freeCompilerArgs += listOf("-Xjvm-default=all")
     }
 
     defaultConfig {

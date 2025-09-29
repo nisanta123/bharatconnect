@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bharatconnect/models/user_profile_model.dart';
 import 'package:bharatconnect/screens/signup_screen.dart';
+import 'package:bharatconnect/widgets/custom_toast.dart';
 import 'package:bharatconnect/main.dart';
 import 'package:bharatconnect/widgets/logo.dart';
 
@@ -52,27 +53,31 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           message = 'An unexpected error occurred during login.';
         }
-        setState(() {
-          _errorMessage = message;
-        });
+        if (mounted) {
+          setState(() {
+            _errorMessage = message;
+          });
+        }
         print(e);
       } catch (e) {
-        setState(() {
-          _errorMessage = 'An unexpected error occurred.';
-        });
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'An unexpected error occurred.';
+          });
+        }
         print(e);
       } finally {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
 
   void _handleGoogleSignIn() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Google Sign-In will be available soon.")),
-    );
+    showCustomToast(context, 'Google Sign-In will be available soon.');
   }
 
   void _forgotPassword() async {
@@ -88,9 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: _email);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Password reset email sent to $_email')),
-      );
+      showCustomToast(context, 'Password reset email sent to $_email');
     } on FirebaseAuthException catch (e) {
       String message;
       if (e.code == 'user-not-found' || e.code == 'invalid-email') {
@@ -98,19 +101,25 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         message = 'Failed to send password reset email.';
       }
-      setState(() {
-        _errorMessage = message;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = message;
+        });
+      }
       print(e);
     } catch (e) {
-      setState(() {
-        _errorMessage = 'An unexpected error occurred.';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'An unexpected error occurred.';
+        });
+      }
       print(e);
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 

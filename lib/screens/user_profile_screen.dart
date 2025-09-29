@@ -3,6 +3,9 @@ import 'package:bharatconnect/services/user_service.dart'; // Import UserService
 import 'package:bharatconnect/models/search_models.dart'; // Import User model
 import 'package:bharatconnect/models/user_profile_model.dart'; // Import UserProfile model
 import 'package:bharatconnect/widgets/default_avatar.dart'; // Import DefaultAvatar
+import 'package:bharatconnect/widgets/custom_toast.dart'; // Use custom toast for notifications
+// chat_models and chat_page imports removed; connections moved to Account Centre
+// (removed unused dart:async import)
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -26,6 +29,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     _fetchUserProfile();
   }
 
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   Future<void> _fetchUserProfile() async {
     try {
       final user = await _userService.getUserById(widget.userId);
@@ -43,45 +51,52 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Profile'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _userProfile == null
-              ? const Center(child: Text('User not found.'))
-              : Center( // Wrap with Center widget
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        DefaultAvatar(
-                          radius: 60,
-                          avatarUrl: _userProfile!.avatarUrl,
-                          name: _userProfile!.displayName,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _userProfile!.displayName,
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '@${_userProfile!.username ?? _userProfile!.email}',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 16),
-                        _buildChatStatusButton(), // Integrate the button here
-                        // Add more user details here as needed
-                      ],
-                    ),
-                  ),
-                ),
+      body: _buildProfileTab(),
     );
   }
+
+  Widget _buildProfileTab() {
+    return _isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : _userProfile == null
+            ? const Center(child: Text('User not found.'))
+            : Center( // Wrap with Center widget
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      DefaultAvatar(
+                        radius: 60,
+                        avatarUrl: _userProfile!.avatarUrl,
+                        name: _userProfile!.displayName,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _userProfile!.displayName,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '@${_userProfile!.username ?? _userProfile!.email}',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey),
+                      ),
+                      // const SizedBox(height: 16), // Removed
+                      // _buildChatStatusButton(), // Removed the chat status button from profile tab
+                      // Add more user details here as needed
+                    ],
+                  ),
+                ),
+              );
+  }
+
+  // Connections tab removed — connections are shown in Account Centre
 
   Widget _buildChatStatusButton() {
     switch (_chatStatus) {
@@ -150,9 +165,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               await _userService.sendChatRequest(widget.currentUserId, widget.userId);
               // Refresh status after sending request
               _fetchUserProfile();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Chat request sent!')),
-              );
+                showCustomToast(context, 'Chat request sent!');
             },
             icon: const Icon(Icons.send, size: 16),
             label: const Text('Send Request'),

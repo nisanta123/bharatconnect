@@ -10,7 +10,7 @@ import 'package:bharatconnect/models/user_profile_model.dart'; // Import UserPro
 class LocalDataStore {
   static Database? _database;
   static const String _databaseName = 'bharatconnect_app.db';
-  static const int _databaseVersion = 1;
+  static const int _databaseVersion = 3;
 
   // Table names
   static const String chatsTable = 'chats';
@@ -78,14 +78,19 @@ class LocalDataStore {
       ")",
     );
 
-    // Statuses table (simplified for now)
+    // Statuses table (store text-based statuses and optional media)
     await db.execute(
       "CREATE TABLE $statusesTable("
       "id TEXT PRIMARY KEY,"
       "userId TEXT,"
+      "text TEXT,"
+      "fontFamily TEXT,"
+      "backgroundColor TEXT,"
       "imageUrl TEXT,"
       "caption TEXT,"
-      "timestamp INTEGER"
+      "createdAt INTEGER,"
+      "expiresAt INTEGER,"
+      "viewed INTEGER DEFAULT 0"
       ")",
     );
 
@@ -127,7 +132,53 @@ class LocalDataStore {
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
     debugPrint('LocalDataStore: Upgrading database from version $oldVersion to $newVersion.');
-    // Implement migration logic here if schema changes in future versions
+    // Migration from v1 -> v2: add missing columns to statuses table
+  if (oldVersion < 2) {
+      try {
+        // Add text column
+        await db.execute("ALTER TABLE $statusesTable ADD COLUMN text TEXT");
+      } catch (e) {
+        debugPrint('LocalDataStore: text column may already exist: $e');
+      }
+      try {
+        await db.execute("ALTER TABLE $statusesTable ADD COLUMN fontFamily TEXT");
+      } catch (e) {
+        debugPrint('LocalDataStore: fontFamily column may already exist: $e');
+      }
+      try {
+        await db.execute("ALTER TABLE $statusesTable ADD COLUMN backgroundColor TEXT");
+      } catch (e) {
+        debugPrint('LocalDataStore: backgroundColor column may already exist: $e');
+      }
+      try {
+        await db.execute("ALTER TABLE $statusesTable ADD COLUMN imageUrl TEXT");
+      } catch (e) {
+        debugPrint('LocalDataStore: imageUrl column may already exist: $e');
+      }
+      try {
+        await db.execute("ALTER TABLE $statusesTable ADD COLUMN caption TEXT");
+      } catch (e) {
+        debugPrint('LocalDataStore: caption column may already exist: $e');
+      }
+      try {
+        await db.execute("ALTER TABLE $statusesTable ADD COLUMN createdAt INTEGER");
+      } catch (e) {
+        debugPrint('LocalDataStore: createdAt column may already exist: $e');
+      }
+      try {
+        await db.execute("ALTER TABLE $statusesTable ADD COLUMN expiresAt INTEGER");
+      } catch (e) {
+        debugPrint('LocalDataStore: expiresAt column may already exist: $e');
+      }
+    }
+    // Migration v2 -> v3: add viewed flag for statuses
+    if (oldVersion < 3) {
+      try {
+        await db.execute("ALTER TABLE $statusesTable ADD COLUMN viewed INTEGER DEFAULT 0");
+      } catch (e) {
+        debugPrint('LocalDataStore: viewed column may already exist: $e');
+      }
+    }
   }
 
   // Generic insert/update method
@@ -429,6 +480,17 @@ class LocalDataStore {
 
   // Specific methods for Status
   Future<void> saveStatus(Status status) async {
+    // Preserve existing viewed flag if present in local DB
+    int viewed = 0;
+    try {
+      final existing = await retrieve(statusesTable, where: 'id = ?', whereArgs: [status.id]);
+      if (existing.isNotEmpty) {
+        viewed = (existing.first['viewed'] as int?) ?? 0;
+      }
+    } catch (e) {
+      debugPrint('LocalDataStore: error checking existing status viewed flag: $e');
+    }
+
     await insertOrUpdate(
       statusesTable,
       {
@@ -439,6 +501,7 @@ class LocalDataStore {
         'backgroundColor': status.backgroundColor,
         'createdAt': status.createdAt.millisecondsSinceEpoch,
         'expiresAt': status.expiresAt.millisecondsSinceEpoch,
+        'viewed': viewed,
       },
     );
   }
@@ -456,16 +519,35 @@ class LocalDataStore {
     return null;
   }
 
+  // Mark a status as viewed locally
+  Future<void> markStatusViewed(String statusId) async {
+    final db = await database;
+    await db.update(
+      statusesTable,
+      {'viewed': 1},
+      where: 'id = ?',
+      whereArgs: [statusId],
+    );
+    debugPrint('LocalDataStore: Marked status $statusId as viewed');
+  }
+
+  // Check if a status has been viewed locally
+  Future<bool> hasViewedStatus(String statusId) async {
+    final rows = await retrieve(statusesTable, where: 'id = ?', whereArgs: [statusId]);
+    if (rows.isNotEmpty) {
+      return (rows.first['viewed'] as int?) == 1;
+    }
+    return false;
+  }
+
   Future<void> deleteStatus(String statusId) async {
     await delete(statusesTable, 'id', statusId);
   }
 
-  // For development: Clear all chat-related tables
-  Future<void> clearAllChatData() async {
+  // Debug helper: clear all statuses from local DB
+  Future<void> clearStatuses() async {
     final db = await database;
-    await db.delete(chatsTable);
-    await db.delete(messagesTable);
-    await db.delete(chatRequestsTable);
-    debugPrint('LocalDataStore: Cleared all chat-related data.');
+    await db.delete(statusesTable);
+    debugPrint('LocalDataStore: Cleared all rows from $statusesTable');
   }
 }

@@ -27,6 +27,8 @@ class _AuraBarState extends State<AuraBar> {
   List<aura_models.DisplayAura> _allDisplayAuras = [];
   bool _isLoading = true;
   StreamSubscription? _auraSubscription;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userDocSub;
+  final Map<String, String?> _avatarOverrides = {}; // hold updated avatar urls per user id
   final AuraService _auraService = AuraService(); // Create an instance of AuraService
 
   @override
@@ -51,11 +53,13 @@ class _AuraBarState extends State<AuraBar> {
   void dispose() {
     print('AuraBar: dispose called.');
     _auraSubscription?.cancel();
+    _userDocSub?.cancel();
     super.dispose();
   }
 
   void _listenForAuras() {
     _auraSubscription?.cancel(); // Cancel previous subscription
+    _userDocSub?.cancel();
 
     if (widget.currentUser == null) {
       print('AuraBar: No current user. Clearing auras.');
@@ -88,6 +92,24 @@ class _AuraBarState extends State<AuraBar> {
         _isLoading = false;
       });
     });
+
+    // Also listen to the current user's Firestore doc so avatarUrl updates are reflected in real time
+    try {
+      final userDocRef = FirebaseFirestore.instance.collection('bharatConnectUsers').doc(widget.currentUser!.id);
+      _userDocSub = userDocRef.snapshots().listen((docSnap) {
+        final data = docSnap.data();
+        final avatarUrl = data != null ? (data['avatarUrl'] as String?) : null;
+        // Only update if changed
+        if (_avatarOverrides[widget.currentUser!.id] != avatarUrl) {
+          _avatarOverrides[widget.currentUser!.id] = avatarUrl;
+          if (mounted) setState(() {});
+        }
+      }, onError: (e) {
+        print('AuraBar: error listening to user doc: $e');
+      });
+    } catch (e) {
+      print('AuraBar: exception setting up user doc listener: $e');
+    }
   }
 
   // Removed _clearExpiredAuraFromFirestore as it's handled by the service or implicitly by aura expiration logic
@@ -144,8 +166,15 @@ class _AuraBarState extends State<AuraBar> {
             );
           } else if (widget.currentUser != null && index == 0) {
             print('AuraBar: Building AuraRingItem for current user.');
+            // Use any avatar override from Firestore listener, fallback to the provided currentUser.avatarUrl
+            final overriddenAvatar = _avatarOverrides[widget.currentUser!.id] ?? widget.currentUser!.avatarUrl;
+            final auraUserForCurrent = aura_models.AuraUser(
+              id: widget.currentUser!.id,
+              name: widget.currentUser!.name,
+              avatarUrl: overriddenAvatar,
+            );
             return AuraRingItem(
-              user: widget.currentUser!,
+              user: auraUserForCurrent,
               activeAura: currentUserAuraFromList, // This is now nullable
               isCurrentUser: true,
               onClick: () => _handleCurrentUserAuraClick(context),

@@ -43,7 +43,7 @@ dependencies:
   flutter_secure_storage: ^9.2.4
   sqflite: ^2.3.3+1 # Add this line
   path_provider: ^2.1.3 # Add this line
-  connectivity_plus: ^6.0.1 # Add this line
+  connectivity_plus: ^7.0.0 # Updated to allow major version upgrade
 
 dev_dependencies:
   flutter_test:
@@ -77,7 +77,3 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/images/logo.png"
   min_sdk_android: 21 # set to min_sdk_android of your project
-  windows: 
-    generate: true
-    image_path: "assets/images/logo.png"
-    icon_size: 48 # min:48, max:256, default: 48

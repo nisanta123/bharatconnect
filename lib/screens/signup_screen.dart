@@ -4,7 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bharatconnect/models/user_profile_model.dart';
 import 'package:bharatconnect/main.dart'; // Import WhatsAppHome
 import 'package:bharatconnect/screens/login_screen.dart'; // Import LoginScreen
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'package:bharatconnect/widgets/logo.dart'; // Import the new Logo widget
+import 'package:bharatconnect/widgets/default_avatar.dart';
 import 'package:bharatconnect/screens/profile_setup_screen.dart' as ps_screen; // Add this import with prefix
 import 'package:bharatconnect/widgets/custom_toast.dart'; // Import CustomToast
 
@@ -24,6 +27,8 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isLoading = false;
   bool _isPasswordVisible = false; // Added for password visibility toggle
   bool _isConfirmPasswordVisible = false; // Added for confirm password visibility toggle
+  File? _pickedProfileImage;
+  String? _pickedProfileImagePath;
 
   @override
   void initState() {
@@ -78,7 +83,12 @@ class _SignupScreenState extends State<SignupScreen> {
         if (userCredential.user != null) {
           print('SignupScreen: User created successfully: ${userCredential.user?.uid}');
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => ps_screen.ProfileSetupScreen(user: userCredential.user!)),
+            MaterialPageRoute(
+              builder: (context) => ps_screen.ProfileSetupScreen(
+                user: userCredential.user!,
+                initialPhotoPath: _pickedProfileImagePath,
+              ),
+            ),
           );
         }
       } on FirebaseAuthException catch (e) {
@@ -114,6 +124,18 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
+  void _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 60, maxWidth: 1024, maxHeight: 1024);
+    if (picked != null) {
+      setState(() {
+        _pickedProfileImage = File(picked.path);
+        _pickedProfileImagePath = picked.path;
+      });
+      showCustomToast(context, 'Profile picture selected. You can change it later.');
+    }
+  }
+
   void _handleLoginLinkClick() {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -144,6 +166,34 @@ class _SignupScreenState extends State<SignupScreen> {
                         padding: EdgeInsets.only(bottom: 24.0),
                         child: Logo(size: "large"),
                       ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: _pickImage,
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            DefaultAvatar(radius: 40, avatarUrl: _pickedProfileImagePath),
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withOpacity(0.25)),
+                                child: Icon(Icons.camera_alt, size: 20, color: Colors.white.withOpacity(0.85)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_pickedProfileImagePath != null)
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _pickedProfileImage = null;
+                              _pickedProfileImagePath = null;
+                            });
+                          },
+                          icon: const Icon(Icons.delete_outline, size: 16),
+                          label: const Text('Remove'),
+                        ),
                       const Text(
                         'Create Account',
                         style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
